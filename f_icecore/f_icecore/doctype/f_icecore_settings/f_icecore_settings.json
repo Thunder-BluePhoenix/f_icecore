@@ -1,0 +1,19 @@
+{
+ "creation": "2025-01-14 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["turn_server", "turn_secret", "stun_port", "turn_port", "enable_audio_calls", "enable_video_calls", "enable_screen_sharing"],
+ "fields": [
+  {"fieldname": "turn_server", "fieldtype": "Data", "label": "TURN Server"},
+  {"fieldname": "turn_secret", "fieldtype": "Password", "label": "TURN Secret"},
+  {"fieldname": "stun_port", "fieldtype": "Int", "label": "STUN Port", "default": "3478"},
+  {"fieldname": "turn_port", "fieldtype": "Int", "label": "TURN Port", "default": "3478"},
+  {"fieldname": "enable_audio_calls", "fieldtype": "Check", "label": "Enable Audio Calls", "default": "1"},
+  {"fieldname": "enable_video_calls", "fieldtype": "Check", "label": "Enable Video Calls", "default": "1"},
+  {"fieldname": "enable_screen_sharing", "fieldtype": "Check", "label": "Enable Screen Sharing", "default": "1"}
+ ],
+ "issingle": 1,
+ "module": "F Icecore",
+ "name": "F IceCore Settings",
+ "permissions": [{"create": 1, "read": 1, "write": 1, "role": "System Manager"}]
+}

@@ -1,9 +1,10 @@
 app_name = "f_icecore"
-app_title = "F Icecore"
-app_publisher = "🚀 Automatic STUN/TURN Server Setup Inside BenchThunder BluePhoenix"
-app_description = "❄️ F-IceCore ---- 📞 WebRTC Calling • Video Calling • Screen Sharing"
+app_title = "F IceCore"
+app_publisher = "Thunder BluePhoenix"
+app_description = "❄️ F-IceCore — WebRTC Calling • Video Calling • Screen Sharing with Auto STUN/TURN Setup"
 app_email = "bluephoenix00995@gmail.com"
 app_license = "gpl-3.0"
+app_version = "0.0.1"
 
 # Apps
 # ------------------
@@ -11,22 +12,22 @@ app_license = "gpl-3.0"
 # required_apps = []
 
 # Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "f_icecore",
-# 		"logo": "/assets/f_icecore/logo.png",
-# 		"title": "F Icecore",
-# 		"route": "/f_icecore",
-# 		"has_permission": "f_icecore.api.permission.has_app_permission"
-# 	}
-# ]
+add_to_apps_screen = [
+	{
+		"name": "f_icecore",
+		"logo": "/assets/f_icecore/images/logo.png",
+		"title": "F IceCore",
+		"route": "/app/f-icecore-dashboard",
+		"has_permission": "f_icecore.api.permissions.has_app_permission"
+	}
+]
 
 # Includes in <head>
 # ------------------
 
 # include js, css files in header of desk.html
-# app_include_css = "/assets/f_icecore/css/f_icecore.css"
-# app_include_js = "/assets/f_icecore/js/f_icecore.js"
+app_include_css = "/assets/f_icecore/css/f_icecore.css"
+app_include_js = "/assets/f_icecore/js/f_icecore.bundle.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/f_icecore/css/f_icecore.css"
@@ -83,7 +84,7 @@ app_license = "gpl-3.0"
 # ------------
 
 # before_install = "f_icecore.install.before_install"
-# after_install = "f_icecore.install.after_install"
+after_install = "f_icecore.install.setup.post_install"
 
 # Uninstallation
 # ------------
@@ -148,23 +149,23 @@ app_license = "gpl-3.0"
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"f_icecore.tasks.all"
-# 	],
-# 	"daily": [
-# 		"f_icecore.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"f_icecore.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"f_icecore.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"f_icecore.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"all": [
+		"f_icecore.api.presence.cleanup_stale_presence"
+	],
+	"hourly": [
+		"f_icecore.api.call_session.cleanup_old_sessions"
+	],
+}
+
+# SocketIO Events
+# ---------------
+# Real-time events for WebRTC signaling
+
+socketio_events = {
+	"f_icecore_signal": "f_icecore.api.signaling.handle_signal",
+	"f_icecore_presence": "f_icecore.api.presence.handle_presence_update",
+}
 
 # Testing
 # -------
