@@ -45,8 +45,9 @@ def initiate_call(to_user, call_type="audio", metadata=None):
 	call_session = create_call_session(from_user, to_user, call_type, metadata)
 
 	# Notify the target user via realtime
+	# Note: When using user= parameter, don't include user in event name
 	publish_realtime(
-		event=f"f_icecore:incoming_call:{to_user}",
+		event="f_icecore:incoming_call",
 		message={
 			"call_id": call_session["name"],
 			"from_user": from_user,
@@ -55,7 +56,8 @@ def initiate_call(to_user, call_type="audio", metadata=None):
 			"metadata": metadata,
 			"timestamp": call_session["creation"]
 		},
-		user=to_user
+		user=to_user,
+		after_commit=True
 	)
 
 	return {
@@ -78,9 +80,10 @@ def accept_call(call_id):
 	call_doc.save(ignore_permissions=True)
 
 	publish_realtime(
-		event=f"f_icecore:call_accepted:{call_doc.from_user}",
+		event="f_icecore:call_accepted",
 		message={"call_id": call_id, "accepted_by": user, "timestamp": datetime.now().isoformat()},
-		user=call_doc.from_user
+		user=call_doc.from_user,
+		after_commit=True
 	)
 
 	return {"success": True, "call_session": call_doc.as_dict()}
@@ -102,9 +105,10 @@ def reject_call(call_id, reason=None):
 
 	other_user = call_doc.from_user if user == call_doc.to_user else call_doc.to_user
 	publish_realtime(
-		event=f"f_icecore:call_rejected:{other_user}",
+		event="f_icecore:call_rejected",
 		message={"call_id": call_id, "rejected_by": user, "reason": reason, "timestamp": datetime.now().isoformat()},
-		user=other_user
+		user=other_user,
+		after_commit=True
 	)
 
 	return {"success": True}
@@ -125,9 +129,10 @@ def end_call(call_id):
 
 	other_user = call_doc.to_user if user == call_doc.from_user else call_doc.from_user
 	publish_realtime(
-		event=f"f_icecore:call_ended:{other_user}",
+		event="f_icecore:call_ended",
 		message={"call_id": call_id, "ended_by": user, "timestamp": datetime.now().isoformat()},
-		user=other_user
+		user=other_user,
+		after_commit=True
 	)
 
 	return {"success": True}

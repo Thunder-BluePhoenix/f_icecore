@@ -27,7 +27,12 @@ add_to_apps_screen = [
 
 # include js, css files in header of desk.html
 app_include_css = "/assets/f_icecore/css/f_icecore.css"
-app_include_js = "/assets/f_icecore/js/f_icecore.bundle.js"
+app_include_js = [
+	"/assets/f_icecore/js/webrtc_engine18.js",  # WebRTC engine (loads first)
+	"/assets/f_icecore/js/call_ui18.js",         # Call UI - HTML escaping fixed!
+	"/assets/f_icecore/js/f_icecore.bundle18.js", # Additional features
+	"/assets/f_icecore/js/f_icecore_boot18.js"   # Navbar & presence
+]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/f_icecore/css/f_icecore.css"

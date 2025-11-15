@@ -1,19 +1,235 @@
 {
- "creation": "2025-01-14 00:00:00",
+ "actions": [],
+ "creation": "2025-11-15 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
- "field_order": ["turn_server", "turn_secret", "stun_port", "turn_port", "enable_audio_calls", "enable_video_calls", "enable_screen_sharing"],
- "fields": [
-  {"fieldname": "turn_server", "fieldtype": "Data", "label": "TURN Server"},
-  {"fieldname": "turn_secret", "fieldtype": "Password", "label": "TURN Secret"},
-  {"fieldname": "stun_port", "fieldtype": "Int", "label": "STUN Port", "default": "3478"},
-  {"fieldname": "turn_port", "fieldtype": "Int", "label": "TURN Port", "default": "3478"},
-  {"fieldname": "enable_audio_calls", "fieldtype": "Check", "label": "Enable Audio Calls", "default": "1"},
-  {"fieldname": "enable_video_calls", "fieldtype": "Check", "label": "Enable Video Calls", "default": "1"},
-  {"fieldname": "enable_screen_sharing", "fieldtype": "Check", "label": "Enable Screen Sharing", "default": "1"}
+ "field_order": [
+  "turn_server_section",
+  "turn_server",
+  "turn_secret",
+  "column_break_4",
+  "stun_port",
+  "turn_port",
+  "turns_port",
+  "section_break_8",
+  "test_connection_button",
+  "connection_status",
+  "credentials_section",
+  "coturn_credentials_info",
+  "save_credentials_button",
+  "credentials_status",
+  "features_section",
+  "enable_audio_calls",
+  "enable_video_calls",
+  "enable_screen_sharing",
+  "column_break_14",
+  "max_call_duration",
+  "enable_call_history",
+  "cleanup_old_calls",
+  "advanced_section",
+  "custom_ringtone",
+  "custom_calling_tone",
+  "column_break_20",
+  "enable_debug_logs",
+  "auto_answer_calls"
  ],
+ "fields": [
+  {
+   "fieldname": "turn_server_section",
+   "fieldtype": "Section Break",
+   "label": "TURN/STUN Server Configuration",
+   "description": "Configure your TURN/STUN server for WebRTC NAT traversal. Run install_scripts/install_coturn.sh to auto-configure."
+  },
+  {
+   "fieldname": "turn_server",
+   "fieldtype": "Data",
+   "label": "TURN Server",
+   "description": "Hostname or IP address of your TURN/STUN server (e.g., stun.example.com or 192.168.1.100)"
+  },
+  {
+   "fieldname": "turn_secret",
+   "fieldtype": "Password",
+   "label": "TURN Secret",
+   "description": "Shared secret for TURN authentication (auto-generated during Coturn installation)"
+  },
+  {
+   "fieldname": "column_break_4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "3478",
+   "fieldname": "stun_port",
+   "fieldtype": "Int",
+   "label": "STUN Port",
+   "description": "Port for STUN server (default: 3478)"
+  },
+  {
+   "default": "3478",
+   "fieldname": "turn_port",
+   "fieldtype": "Int",
+   "label": "TURN Port",
+   "description": "Port for TURN server (default: 3478)"
+  },
+  {
+   "default": "5349",
+   "fieldname": "turns_port",
+   "fieldtype": "Int",
+   "label": "TURNS Port (TLS)",
+   "description": "Port for TURN over TLS (default: 5349)"
+  },
+  {
+   "fieldname": "section_break_8",
+   "fieldtype": "Section Break",
+   "label": "Connection Test"
+  },
+  {
+   "fieldname": "test_connection_button",
+   "fieldtype": "Button",
+   "label": "Test TURN Connection",
+   "description": "Click to test if your TURN/STUN server is properly configured"
+  },
+  {
+   "fieldname": "connection_status",
+   "fieldtype": "HTML",
+   "label": "Connection Status",
+   "options": "<div id=\"turn-connection-status\" class=\"text-muted\">Click &quot;Test TURN Connection&quot; to check server status</div>"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "credentials_section",
+   "fieldtype": "Section Break",
+   "label": "Save Coturn Credentials",
+   "description": "After installing Coturn, use this to save the credentials to Frappe"
+  },
+  {
+   "fieldname": "coturn_credentials_info",
+   "fieldtype": "HTML",
+   "label": "Info",
+   "options": "<div class=\"alert alert-info\"><strong>ℹ️ How to use:</strong><br>After running <code>install_scripts/install_coturn.sh</code>, the installer will show your TURN server address and secret. Enter them in the fields above, then click <strong>Save Credentials</strong> to apply.</div>"
+  },
+  {
+   "fieldname": "save_credentials_button",
+   "fieldtype": "Button",
+   "label": "Save Credentials",
+   "description": "Save the TURN server settings entered above"
+  },
+  {
+   "fieldname": "credentials_status",
+   "fieldtype": "HTML",
+   "label": "Status",
+   "options": "<div id=\"credentials-save-status\"></div>"
+  },
+  {
+   "fieldname": "features_section",
+   "fieldtype": "Section Break",
+   "label": "Call Features",
+   "description": "Enable or disable specific calling features for all users"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_audio_calls",
+   "fieldtype": "Check",
+   "label": "Enable Audio Calls",
+   "description": "Allow users to make voice calls"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_video_calls",
+   "fieldtype": "Check",
+   "label": "Enable Video Calls",
+   "description": "Allow users to make video calls (requires camera permissions)"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_screen_sharing",
+   "fieldtype": "Check",
+   "label": "Enable Screen Sharing",
+   "description": "Allow users to share their screen during calls"
+  },
+  {
+   "fieldname": "column_break_14",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "max_call_duration",
+   "fieldtype": "Int",
+   "label": "Max Call Duration (seconds)",
+   "description": "Maximum duration for calls in seconds (0 = unlimited). Example: 3600 for 1 hour"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_call_history",
+   "fieldtype": "Check",
+   "label": "Enable Call History",
+   "description": "Store call history and statistics in the database"
+  },
+  {
+   "default": "90",
+   "fieldname": "cleanup_old_calls",
+   "fieldtype": "Int",
+   "label": "Cleanup Old Calls (days)",
+   "description": "Automatically delete call history older than this many days (0 = never delete)"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "advanced_section",
+   "fieldtype": "Section Break",
+   "label": "Advanced Settings"
+  },
+  {
+   "fieldname": "custom_ringtone",
+   "fieldtype": "Data",
+   "label": "Custom Ringtone Path",
+   "description": "Path to custom ringtone MP3 file (e.g., /assets/f_icecore/sounds/ringtone.mp3)"
+  },
+  {
+   "fieldname": "custom_calling_tone",
+   "fieldtype": "Data",
+   "label": "Custom Calling Tone Path",
+   "description": "Path to custom calling tone MP3 file (e.g., /assets/f_icecore/sounds/calling.mp3)"
+  },
+  {
+   "fieldname": "column_break_20",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_debug_logs",
+   "fieldtype": "Check",
+   "label": "Enable Debug Logs",
+   "description": "Enable verbose logging for troubleshooting (logs to browser console)"
+  },
+  {
+   "default": "0",
+   "fieldname": "auto_answer_calls",
+   "fieldtype": "Check",
+   "label": "Auto-Answer Calls (Testing Only)",
+   "description": "Automatically accept incoming calls (for testing purposes only)"
+  }
+ ],
+ "index_web_pages_for_search": 1,
  "issingle": 1,
+ "links": [],
+ "modified": "2025-11-16 00:00:00",
+ "modified_by": "Administrator",
  "module": "F Icecore",
  "name": "F IceCore Settings",
- "permissions": [{"create": 1, "read": 1, "write": 1, "role": "System Manager"}]
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
 }

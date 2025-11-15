@@ -1,0 +1,454 @@
+/**
+ * F-IceCore Styles
+ * Discord-inspired call interface
+ */
+
+/* Call Window Styles */
+.f-icecore-call-window {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.f-icecore-incoming-call,
+.f-icecore-calling {
+	animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+		transform: translateY(-10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Video Container */
+.video-container {
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+	overflow: hidden;
+}
+
+.video-container video {
+	display: block;
+}
+
+/* Call Controls */
+.call-controls button {
+	border-radius: 50%;
+	width: 60px;
+	height: 60px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.3s ease;
+	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.call-controls button:hover {
+	transform: scale(1.1);
+	box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.call-controls button i {
+	font-size: 20px;
+}
+
+/* Presence Indicators */
+.f-icecore-presence {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	margin-right: 5px;
+	border: 2px solid #fff;
+}
+
+.f-icecore-presence.online {
+	background-color: #43b581; /* Green */
+}
+
+.f-icecore-presence.offline {
+	background-color: #747f8d; /* Gray */
+}
+
+.f-icecore-presence.busy {
+	background-color: #f04747; /* Red */
+}
+
+.f-icecore-presence.in_call {
+	background-color: #faa61a; /* Orange */
+	animation: pulse 2s infinite;
+}
+
+.f-icecore-presence.away {
+	background-color: #faa61a; /* Yellow */
+}
+
+@keyframes pulse {
+	0%, 100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.5;
+	}
+}
+
+/* User List with Call Buttons */
+.f-icecore-user-card {
+	display: flex;
+	align-items: center;
+	padding: 10px;
+	border-radius: 8px;
+	margin-bottom: 8px;
+	transition: background 0.2s;
+	cursor: pointer;
+}
+
+.f-icecore-user-card:hover {
+	background-color: #f5f5f5;
+}
+
+.f-icecore-user-card .user-avatar {
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	margin-right: 12px;
+	position: relative;
+}
+
+.f-icecore-user-card .user-avatar .f-icecore-presence {
+	position: absolute;
+	bottom: 0;
+	right: 0;
+	border: 2px solid #fff;
+}
+
+.f-icecore-user-card .user-info {
+	flex: 1;
+}
+
+.f-icecore-user-card .user-name {
+	font-weight: 500;
+	margin-bottom: 2px;
+}
+
+.f-icecore-user-card .user-status {
+	font-size: 12px;
+	color: #888;
+}
+
+.f-icecore-user-card .call-actions {
+	display: flex;
+	gap: 5px;
+	opacity: 0;
+	transition: opacity 0.2s;
+}
+
+.f-icecore-user-card:hover .call-actions {
+	opacity: 1;
+}
+
+.f-icecore-user-card .call-actions button {
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	background: #5865f2;
+	color: white;
+	cursor: pointer;
+	transition: all 0.2s;
+}
+
+.f-icecore-user-card .call-actions button:hover {
+	background: #4752c4;
+	transform: scale(1.1);
+}
+
+.f-icecore-user-card .call-actions button.video {
+	background: #3ba55d;
+}
+
+.f-icecore-user-card .call-actions button.video:hover {
+	background: #2d7d46;
+}
+
+/* Call History */
+.f-icecore-call-history-item {
+	display: flex;
+	align-items: center;
+	padding: 12px;
+	border-bottom: 1px solid #e5e5e5;
+	transition: background 0.2s;
+}
+
+.f-icecore-call-history-item:hover {
+	background-color: #f9f9f9;
+}
+
+.f-icecore-call-history-item .call-icon {
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-right: 12px;
+	font-size: 18px;
+}
+
+.f-icecore-call-history-item .call-icon.incoming {
+	background-color: #e8f5e9;
+	color: #43b581;
+}
+
+.f-icecore-call-history-item .call-icon.outgoing {
+	background-color: #e3f2fd;
+	color: #5865f2;
+}
+
+.f-icecore-call-history-item .call-icon.missed {
+	background-color: #ffebee;
+	color: #f04747;
+}
+
+.f-icecore-call-history-item .call-info {
+	flex: 1;
+}
+
+.f-icecore-call-history-item .call-user {
+	font-weight: 500;
+	margin-bottom: 2px;
+}
+
+.f-icecore-call-history-item .call-meta {
+	font-size: 12px;
+	color: #888;
+}
+
+/* Notification Badge */
+.f-icecore-notification-badge {
+	position: absolute;
+	top: -5px;
+	right: -5px;
+	background-color: #f04747;
+	color: white;
+	border-radius: 10px;
+	padding: 2px 6px;
+	font-size: 11px;
+	font-weight: bold;
+	min-width: 18px;
+	text-align: center;
+}
+
+/* Ringing Animation */
+.f-icecore-ringing {
+	animation: ring 1s ease-in-out infinite;
+}
+
+@keyframes ring {
+	0%, 100% {
+		transform: rotate(0deg);
+	}
+	10%, 30% {
+		transform: rotate(-10deg);
+	}
+	20%, 40% {
+		transform: rotate(10deg);
+	}
+}
+
+/* Connection Status */
+.f-icecore-connection-status {
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	background: rgba(0, 0, 0, 0.7);
+	color: white;
+	padding: 5px 10px;
+	border-radius: 5px;
+	font-size: 12px;
+	display: flex;
+	align-items: center;
+	gap: 5px;
+}
+
+.f-icecore-connection-status .status-indicator {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background-color: #43b581;
+}
+
+.f-icecore-connection-status.connecting .status-indicator {
+	background-color: #faa61a;
+	animation: pulse 1s infinite;
+}
+
+.f-icecore-connection-status.failed .status-indicator {
+	background-color: #f04747;
+}
+
+/* Quality Indicator */
+.f-icecore-quality-indicator {
+	display: flex;
+	gap: 2px;
+	align-items: flex-end;
+}
+
+.f-icecore-quality-indicator .bar {
+	width: 3px;
+	background-color: #43b581;
+	border-radius: 2px;
+}
+
+.f-icecore-quality-indicator .bar:nth-child(1) {
+	height: 8px;
+}
+
+.f-icecore-quality-indicator .bar:nth-child(2) {
+	height: 12px;
+}
+
+.f-icecore-quality-indicator .bar:nth-child(3) {
+	height: 16px;
+}
+
+.f-icecore-quality-indicator .bar:nth-child(4) {
+	height: 20px;
+}
+
+.f-icecore-quality-indicator.poor .bar {
+	background-color: #f04747;
+}
+
+.f-icecore-quality-indicator.fair .bar {
+	background-color: #faa61a;
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+	.f-icecore-user-card:hover {
+		background-color: #2f3136;
+	}
+
+	.f-icecore-call-history-item {
+		border-bottom-color: #2f3136;
+	}
+
+	.f-icecore-call-history-item:hover {
+		background-color: #2f3136;
+	}
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+	.video-container {
+		min-height: 300px !important;
+	}
+
+	.video-container video {
+		height: 300px !important;
+	}
+
+	#f-icecore-local-video {
+		width: 120px !important;
+		height: 90px !important;
+		bottom: 10px !important;
+		right: 10px !important;
+	}
+
+	.call-controls button {
+		width: 50px;
+		height: 50px;
+	}
+
+	.call-controls button i {
+		font-size: 16px;
+	}
+}
+
+/* Toast Notification for Incoming Calls */
+.f-icecore-toast-call {
+	position: fixed;
+	top: 20px;
+	right: 20px;
+	background: white;
+	border-radius: 8px;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+	padding: 15px;
+	z-index: 10000;
+	min-width: 300px;
+	animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+	from {
+		transform: translateX(400px);
+		opacity: 0;
+	}
+	to {
+		transform: translateX(0);
+		opacity: 1;
+	}
+}
+
+.f-icecore-toast-call .toast-avatar {
+	width: 50px;
+	height: 50px;
+	border-radius: 50%;
+	float: left;
+	margin-right: 15px;
+}
+
+.f-icecore-toast-call .toast-content {
+	overflow: hidden;
+}
+
+.f-icecore-toast-call .toast-title {
+	font-weight: 600;
+	margin-bottom: 5px;
+}
+
+.f-icecore-toast-call .toast-message {
+	font-size: 13px;
+	color: #666;
+	margin-bottom: 10px;
+}
+
+.f-icecore-toast-call .toast-actions {
+	display: flex;
+	gap: 10px;
+}
+
+.f-icecore-toast-call .toast-actions button {
+	flex: 1;
+	padding: 8px;
+	border: none;
+	border-radius: 5px;
+	cursor: pointer;
+	font-weight: 500;
+	transition: all 0.2s;
+}
+
+.f-icecore-toast-call .toast-actions button.accept {
+	background: #43b581;
+	color: white;
+}
+
+.f-icecore-toast-call .toast-actions button.accept:hover {
+	background: #3ca374;
+}
+
+.f-icecore-toast-call .toast-actions button.decline {
+	background: #f04747;
+	color: white;
+}
+
+.f-icecore-toast-call .toast-actions button.decline:hover {
+	background: #d84040;
+}
