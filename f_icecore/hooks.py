@@ -18,7 +18,7 @@ add_to_apps_screen = [
 		"logo": "/assets/f_icecore/images/logo.png",
 		"title": "F IceCore",
 		"route": "/app/f-icecore-dashboard",
-		"has_permission": "f_icecore.api.permissions.has_app_permission"
+		"has_permission": "f_icecore.f_icecore.api.permissions.has_app_permission"
 	}
 ]
 
@@ -83,8 +83,8 @@ app_include_js = "/assets/f_icecore/js/f_icecore.bundle.js"
 # Installation
 # ------------
 
-# before_install = "f_icecore.install.before_install"
-after_install = "f_icecore.install.setup.post_install"
+# before_install = "f_icecore.f_icecore.install.before_install"
+after_install = "f_icecore.f_icecore.install.setup.post_install"
 
 # Uninstallation
 # ------------
@@ -151,10 +151,10 @@ after_install = "f_icecore.install.setup.post_install"
 
 scheduler_events = {
 	"all": [
-		"f_icecore.api.presence.cleanup_stale_presence"
+		"f_icecore.f_icecore.api.presence.cleanup_stale_presence"
 	],
 	"hourly": [
-		"f_icecore.api.call_session.cleanup_old_sessions"
+		"f_icecore.f_icecore.api.call_session.cleanup_old_sessions"
 	],
 }
 
@@ -163,8 +163,8 @@ scheduler_events = {
 # Real-time events for WebRTC signaling
 
 socketio_events = {
-	"f_icecore_signal": "f_icecore.api.signaling.handle_signal",
-	"f_icecore_presence": "f_icecore.api.presence.handle_presence_update",
+	"f_icecore_signal": "f_icecore.f_icecore.api.signaling.handle_signal",
+	"f_icecore_presence": "f_icecore.f_icecore.api.presence.handle_presence_update",
 }
 
 # Testing
