@@ -3,6 +3,7 @@
 ##############################################################################
 # F-IceCore Coturn Installation Script
 # Installs and configures Coturn STUN/TURN server for WebRTC
+# Supports: Linux (Ubuntu, Debian, CentOS, RHEL, Fedora) and macOS
 ##############################################################################
 
 set -e
@@ -10,19 +11,37 @@ set -e
 echo "❄️  F-IceCore: Coturn Installation Starting..."
 echo "================================================"
 
-# Check if running as root
-if [ "$EUID" -ne 0 ]; then
-    echo "❌ Please run as root or with sudo"
-    exit 1
-fi
-
 # Detect OS
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    OS=$ID
-else
-    echo "❌ Cannot detect OS"
-    exit 1
+UNAME_S=$(uname -s)
+case "$UNAME_S" in
+    Linux*)
+        OS_TYPE="Linux"
+        if [ -f /etc/os-release ]; then
+            . /etc/os-release
+            OS=$ID
+        else
+            echo "❌ Cannot detect Linux distribution"
+            exit 1
+        fi
+        ;;
+    Darwin*)
+        OS_TYPE="macOS"
+        OS="macos"
+        ;;
+    *)
+        echo "❌ Unsupported operating system: $UNAME_S"
+        exit 1
+        ;;
+esac
+
+echo "📋 Detected OS: $OS_TYPE ($OS)"
+
+# Check if running with appropriate privileges
+if [ "$OS_TYPE" = "Linux" ]; then
+    if [ "$EUID" -ne 0 ]; then
+        echo "❌ Please run as root or with sudo on Linux"
+        exit 1
+    fi
 fi
 
 # Install Coturn
@@ -31,10 +50,32 @@ case $OS in
     ubuntu|debian)
         apt-get update
         apt-get install -y coturn
+        COTURN_CONFIG="/etc/turnserver.conf"
+        COTURN_SERVICE="coturn"
         ;;
     centos|rhel|fedora)
         yum install -y epel-release
         yum install -y coturn
+        COTURN_CONFIG="/etc/turnserver.conf"
+        COTURN_SERVICE="coturn"
+        ;;
+    macos)
+        # Check if Homebrew is installed
+        if ! command -v brew &> /dev/null; then
+            echo "❌ Homebrew is not installed. Please install Homebrew first:"
+            echo "   /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+            exit 1
+        fi
+
+        echo "📦 Installing Coturn via Homebrew..."
+        brew install coturn
+
+        # macOS uses different paths
+        COTURN_CONFIG="/usr/local/etc/turnserver.conf"
+        COTURN_SERVICE="coturn"
+
+        # Create config directory if it doesn't exist
+        mkdir -p /usr/local/etc
         ;;
     *)
         echo "❌ Unsupported OS: $OS"
@@ -43,21 +84,33 @@ case $OS in
 esac
 
 # Stop Coturn if running
-systemctl stop coturn 2>/dev/null || true
+if [ "$OS_TYPE" = "Linux" ]; then
+    systemctl stop coturn 2>/dev/null || true
+elif [ "$OS_TYPE" = "macOS" ]; then
+    brew services stop coturn 2>/dev/null || true
+fi
 
 # Generate secure credentials
 TURN_SECRET=$(openssl rand -hex 32)
-SERVER_IP=$(hostname -I | awk '{print $1}')
+
+# Get server IP
+if [ "$OS_TYPE" = "macOS" ]; then
+    # On macOS, get the first non-loopback IP
+    SERVER_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -n1)
+else
+    SERVER_IP=$(hostname -I | awk '{print $1}')
+fi
+
 REALM="${REALM:-$SERVER_IP}"
 
 # Backup existing config if present
-if [ -f /etc/turnserver.conf ]; then
-    cp /etc/turnserver.conf /etc/turnserver.conf.backup.$(date +%s)
+if [ -f "$COTURN_CONFIG" ]; then
+    cp "$COTURN_CONFIG" "${COTURN_CONFIG}.backup.$(date +%s)"
 fi
 
 # Create Coturn configuration
 echo "⚙️  Configuring Coturn..."
-cat > /etc/turnserver.conf <<EOF
+cat > "$COTURN_CONFIG" <<EOF
 # F-IceCore Coturn Configuration
 # Generated on $(date)
 
@@ -88,35 +141,11 @@ verbose
 # Log file
 log-file=/var/log/turnserver.log
 
-# Deny by default, allow specific IPs if needed
-# denied-peer-ip=0.0.0.0-0.255.255.255
-# denied-peer-ip=127.0.0.0-127.255.255.255
-
 # No multicast peers
 no-multicast-peers
 
 # Mobility support
 mobility
-
-# Rate limiting
-# total-quota=100
-# bps-capacity=0
-
-# TLS/DTLS
-# cert=/etc/coturn/cert.pem
-# pkey=/etc/coturn/pkey.pem
-
-# Disable CLI
-no-cli
-
-# Disable UDP relay endpoints
-# no-udp-relay
-
-# Disable TCP relay endpoints
-# no-tcp-relay
-
-# Enable STUN
-# stun-only
 
 # For better NAT traversal
 external-ip=$SERVER_IP
@@ -128,32 +157,52 @@ EOF
 # Create log directory
 mkdir -p /var/log
 touch /var/log/turnserver.log
-chown turnserver:turnserver /var/log/turnserver.log 2>/dev/null || true
 
-# Enable Coturn service
-echo "🔧 Enabling Coturn service..."
-
-# Enable in /etc/default/coturn (Debian/Ubuntu specific)
-if [ -f /etc/default/coturn ]; then
-    sed -i 's/#TURNSERVER_ENABLED=1/TURNSERVER_ENABLED=1/' /etc/default/coturn
+# Set permissions
+if [ "$OS_TYPE" = "Linux" ]; then
+    chown turnserver:turnserver /var/log/turnserver.log 2>/dev/null || true
+elif [ "$OS_TYPE" = "macOS" ]; then
+    chmod 644 /var/log/turnserver.log
 fi
 
 # Enable and start Coturn
-systemctl enable coturn
-systemctl start coturn
+echo "🔧 Enabling Coturn service..."
 
-# Check if Coturn is running
-sleep 2
-if systemctl is-active --quiet coturn; then
-    echo "✅ Coturn is running"
-else
-    echo "⚠️  Coturn may not be running. Check: systemctl status coturn"
+if [ "$OS_TYPE" = "Linux" ]; then
+    # Enable in /etc/default/coturn (Debian/Ubuntu specific)
+    if [ -f /etc/default/coturn ]; then
+        sed -i 's/#TURNSERVER_ENABLED=1/TURNSERVER_ENABLED=1/' /etc/default/coturn
+    fi
+
+    # Enable and start Coturn
+    systemctl enable coturn
+    systemctl start coturn
+
+    # Check if Coturn is running
+    sleep 2
+    if systemctl is-active --quiet coturn; then
+        echo "✅ Coturn is running"
+    else
+        echo "⚠️  Coturn may not be running. Check: systemctl status coturn"
+    fi
+elif [ "$OS_TYPE" = "macOS" ]; then
+    # Start Coturn using brew services
+    brew services start coturn
+
+    echo "✅ Coturn service started via Homebrew"
+    echo "   To check status: brew services list"
+    echo "   To stop: brew services stop coturn"
 fi
 
 # Save credentials to file for reference
-CREDS_FILE="/etc/coturn/f_icecore_credentials.txt"
-mkdir -p /etc/coturn
-cat > $CREDS_FILE <<EOF
+if [ "$OS_TYPE" = "Linux" ]; then
+    CREDS_FILE="/etc/coturn/f_icecore_credentials.txt"
+    mkdir -p /etc/coturn
+elif [ "$OS_TYPE" = "macOS" ]; then
+    CREDS_FILE="/usr/local/etc/f_icecore_credentials.txt"
+fi
+
+cat > "$CREDS_FILE" <<EOF
 F-IceCore TURN Server Credentials
 ==================================
 Generated: $(date)
@@ -169,7 +218,7 @@ TURNS URL: turns:$SERVER_IP:5349
 Note: Use REST API to generate time-limited credentials
 EOF
 
-chmod 600 $CREDS_FILE
+chmod 600 "$CREDS_FILE"
 
 echo ""
 echo "================================================"
@@ -183,21 +232,35 @@ echo "   Realm: $REALM"
 echo "   Secret: $TURN_SECRET"
 echo ""
 echo "📝 Credentials saved to: $CREDS_FILE"
+echo "   Config file: $COTURN_CONFIG"
 echo ""
-echo "🔥 Firewall Configuration:"
-echo "   You may need to open these ports:"
-echo "   - UDP/TCP 3478 (STUN/TURN)"
-echo "   - UDP/TCP 5349 (TURNS)"
-echo "   - UDP 49152-65535 (media relay)"
-echo ""
-echo "   Example (UFW):"
-echo "   sudo ufw allow 3478/tcp"
-echo "   sudo ufw allow 3478/udp"
-echo "   sudo ufw allow 5349/tcp"
-echo "   sudo ufw allow 5349/udp"
-echo "   sudo ufw allow 49152:65535/udp"
-echo ""
-echo "🔍 Check status: systemctl status coturn"
-echo "📄 Check logs: tail -f /var/log/turnserver.log"
+
+if [ "$OS_TYPE" = "Linux" ]; then
+    echo "🔥 Firewall Configuration:"
+    echo "   You may need to open these ports:"
+    echo "   - UDP/TCP 3478 (STUN/TURN)"
+    echo "   - UDP/TCP 5349 (TURNS)"
+    echo "   - UDP 49152-65535 (media relay)"
+    echo ""
+    echo "   Example (UFW):"
+    echo "   sudo ufw allow 3478/tcp"
+    echo "   sudo ufw allow 3478/udp"
+    echo "   sudo ufw allow 5349/tcp"
+    echo "   sudo ufw allow 5349/udp"
+    echo "   sudo ufw allow 49152:65535/udp"
+    echo ""
+    echo "🔍 Check status: systemctl status coturn"
+    echo "📄 Check logs: tail -f /var/log/turnserver.log"
+elif [ "$OS_TYPE" = "macOS" ]; then
+    echo "🔥 Firewall Configuration:"
+    echo "   On macOS, you may need to allow Coturn in System Preferences > Security & Privacy > Firewall"
+    echo ""
+    echo "🔍 Check status: brew services list"
+    echo "📄 Check logs: tail -f /var/log/turnserver.log"
+    echo ""
+    echo "⚠️  Note: For production use on macOS, you may want to run Coturn on a Linux server"
+    echo "   macOS is suitable for development/testing only"
+fi
+
 echo ""
 echo "❄️  Happy Calling!"
