@@ -42,6 +42,14 @@ if [ "$OS_TYPE" = "Linux" ]; then
         echo "❌ Please run as root or with sudo on Linux"
         exit 1
     fi
+elif [ "$OS_TYPE" = "macOS" ]; then
+    if [ "$EUID" -eq 0 ]; then
+        echo "❌ Do NOT run with sudo on macOS!"
+        echo "   Homebrew does not support running as root."
+        echo "   Please run without sudo:"
+        echo "   bash install_scripts/install_coturn.sh"
+        exit 1
+    fi
 fi
 
 # Install Coturn
@@ -51,13 +59,17 @@ case $OS in
         apt-get update
         apt-get install -y coturn
         COTURN_CONFIG="/etc/turnserver.conf"
-        COTURN_SERVICE="coturn"
+        LOG_DIR="/var/log"
+        LOG_FILE="/var/log/turnserver.log"
+        CREDS_DIR="/etc/coturn"
         ;;
     centos|rhel|fedora)
         yum install -y epel-release
         yum install -y coturn
         COTURN_CONFIG="/etc/turnserver.conf"
-        COTURN_SERVICE="coturn"
+        LOG_DIR="/var/log"
+        LOG_FILE="/var/log/turnserver.log"
+        CREDS_DIR="/etc/coturn"
         ;;
     macos)
         # Check if Homebrew is installed
@@ -70,12 +82,16 @@ case $OS in
         echo "📦 Installing Coturn via Homebrew..."
         brew install coturn
 
-        # macOS uses different paths
-        COTURN_CONFIG="/usr/local/etc/turnserver.conf"
-        COTURN_SERVICE="coturn"
+        # macOS uses Homebrew paths (user-writable)
+        BREW_PREFIX=$(brew --prefix)
+        COTURN_CONFIG="$BREW_PREFIX/etc/turnserver.conf"
+        LOG_DIR="$BREW_PREFIX/var/log"
+        LOG_FILE="$LOG_DIR/turnserver.log"
+        CREDS_DIR="$BREW_PREFIX/etc"
 
-        # Create config directory if it doesn't exist
-        mkdir -p /usr/local/etc
+        # Create directories if they don't exist
+        mkdir -p "$BREW_PREFIX/etc"
+        mkdir -p "$LOG_DIR"
         ;;
     *)
         echo "❌ Unsupported OS: $OS"
@@ -139,7 +155,7 @@ realm=$REALM
 verbose
 
 # Log file
-log-file=/var/log/turnserver.log
+log-file=$LOG_FILE
 
 # No multicast peers
 no-multicast-peers
@@ -154,15 +170,15 @@ external-ip=$SERVER_IP
 pidfile=/var/run/turnserver.pid
 EOF
 
-# Create log directory
-mkdir -p /var/log
-touch /var/log/turnserver.log
+# Create log directory and file
+mkdir -p "$LOG_DIR"
+touch "$LOG_FILE"
 
 # Set permissions
 if [ "$OS_TYPE" = "Linux" ]; then
-    chown turnserver:turnserver /var/log/turnserver.log 2>/dev/null || true
+    chown turnserver:turnserver "$LOG_FILE" 2>/dev/null || true
 elif [ "$OS_TYPE" = "macOS" ]; then
-    chmod 644 /var/log/turnserver.log
+    chmod 644 "$LOG_FILE"
 fi
 
 # Enable and start Coturn
@@ -195,12 +211,8 @@ elif [ "$OS_TYPE" = "macOS" ]; then
 fi
 
 # Save credentials to file for reference
-if [ "$OS_TYPE" = "Linux" ]; then
-    CREDS_FILE="/etc/coturn/f_icecore_credentials.txt"
-    mkdir -p /etc/coturn
-elif [ "$OS_TYPE" = "macOS" ]; then
-    CREDS_FILE="/usr/local/etc/f_icecore_credentials.txt"
-fi
+mkdir -p "$CREDS_DIR"
+CREDS_FILE="$CREDS_DIR/f_icecore_credentials.txt"
 
 cat > "$CREDS_FILE" <<EOF
 F-IceCore TURN Server Credentials
@@ -250,13 +262,13 @@ if [ "$OS_TYPE" = "Linux" ]; then
     echo "   sudo ufw allow 49152:65535/udp"
     echo ""
     echo "🔍 Check status: systemctl status coturn"
-    echo "📄 Check logs: tail -f /var/log/turnserver.log"
+    echo "📄 Check logs: tail -f $LOG_FILE"
 elif [ "$OS_TYPE" = "macOS" ]; then
     echo "🔥 Firewall Configuration:"
     echo "   On macOS, you may need to allow Coturn in System Preferences > Security & Privacy > Firewall"
     echo ""
     echo "🔍 Check status: brew services list"
-    echo "📄 Check logs: tail -f /var/log/turnserver.log"
+    echo "📄 Check logs: tail -f $LOG_FILE"
     echo ""
     echo "⚠️  Note: For production use on macOS, you may want to run Coturn on a Linux server"
     echo "   macOS is suitable for development/testing only"
