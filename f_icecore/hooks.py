@@ -29,8 +29,8 @@ add_to_apps_screen = [
 app_include_css = "/assets/f_icecore/css/f_icecore.css"
 app_include_js = [
 	"/assets/f_icecore/js/webrtc_engine30.js",  # WebRTC engine (loads first)
-	"/assets/f_icecore/js/call_ui32.js",         # Call UI - With realtime check & retry!
-	"/assets/f_icecore/js/f_icecore.bundle23.js", # Additional features
+	"/assets/f_icecore/js/call_ui36.js",         # Call UI - With realtime check & retry!
+	"/assets/f_icecore/js/f_icecore.bundle30.js", # Additional features
 	"/assets/f_icecore/js/f_icecore_boot23.js"   # Navbar with pending calls
 ]
 
