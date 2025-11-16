@@ -3,11 +3,12 @@
  "creation": "2025-01-14 00:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
- "field_order": ["from_user", "to_user", "call_type", "status", "creation", "accepted_at", "ended_at", "duration", "end_reason"],
+ "field_order": ["from_user", "to_user", "call_type", "is_urgent", "status", "creation", "accepted_at", "ended_at", "duration", "end_reason"],
  "fields": [
   {"fieldname": "from_user", "fieldtype": "Link", "label": "From User", "options": "User", "reqd": 1},
   {"fieldname": "to_user", "fieldtype": "Link", "label": "To User", "options": "User", "reqd": 1},
   {"fieldname": "call_type", "fieldtype": "Select", "label": "Call Type", "options": "audio\nvideo\nscreen", "reqd": 1},
+  {"fieldname": "is_urgent", "fieldtype": "Check", "label": "Is Urgent", "default": 0},
   {"fieldname": "status", "fieldtype": "Select", "label": "Status", "options": "Ringing\nActive\nEnded\nRejected", "default": "Ringing"},
   {"fieldname": "accepted_at", "fieldtype": "Datetime", "label": "Accepted At"},
   {"fieldname": "ended_at", "fieldtype": "Datetime", "label": "Ended At"},
