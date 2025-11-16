@@ -77,8 +77,8 @@ class FIceCoreWebRTC {
 			await this.handleRemoteIceCandidate(data);
 		});
 
-		// Listen for call ended
-		frappe.realtime.on(`f_icecore:call_ended:${user}`, (data) => {
+		// Listen for call ended (event sent with user= parameter, no suffix needed)
+		frappe.realtime.on('f_icecore:call_ended', (data) => {
 			console.log('Call ended by:', data.ended_by);
 			this.endCall();
 		});
