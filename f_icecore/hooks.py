@@ -28,8 +28,8 @@ add_to_apps_screen = [
 # include js, css files in header of desk.html
 app_include_css = "/assets/f_icecore/css/f_icecore.css"
 app_include_js = [
-	"/assets/f_icecore/js/webrtc_engine25.js",  # WebRTC engine (loads first)
-	"/assets/f_icecore/js/call_ui27.js",         # Call UI - With realtime check & retry!
+	"/assets/f_icecore/js/webrtc_engine28.js",  # WebRTC engine (loads first)
+	"/assets/f_icecore/js/call_ui32.js",         # Call UI - With realtime check & retry!
 	"/assets/f_icecore/js/f_icecore.bundle23.js", # Additional features
 	"/assets/f_icecore/js/f_icecore_boot23.js"   # Navbar with pending calls
 ]
