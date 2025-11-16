@@ -44,21 +44,34 @@ def initiate_call(to_user, call_type="audio", metadata=None):
 	# Create call session
 	call_session = create_call_session(from_user, to_user, call_type, metadata)
 
-	# Notify the target user via realtime
-	# Note: When using user= parameter, don't include user in event name
+	# Broadcast call to all users (like f_chat does)
+	# Client-side will filter who should receive it
+	print(f"\n\n🔔🔔🔔 F-IceCore: Broadcasting incoming_call from {from_user} to {to_user}\n")
+	frappe.logger().info(f"🔔 F-IceCore: Broadcasting incoming_call from {from_user} to {to_user}")
+
+	call_data = {
+		"call_id": call_session["name"],
+		"from_user": from_user,
+		"from_user_name": frappe.db.get_value("User", from_user, "full_name"),
+		"to_user": to_user,  # Client-side will filter based on this
+		"call_type": call_type,
+		"metadata": metadata,
+		"timestamp": str(call_session["creation"])
+	}
+
+	print(f"🔔 F-IceCore: call_data = {call_data}\n")
+
+	# Broadcast to all users (no user parameter, like presence_update does)
+	# Client-side will filter based on to_user field
+	print(f"🔔 F-IceCore: Broadcasting to ALL users (no user param, with after_commit=True)\n")
 	publish_realtime(
-		event="f_icecore:incoming_call",
-		message={
-			"call_id": call_session["name"],
-			"from_user": from_user,
-			"from_user_name": frappe.db.get_value("User", from_user, "full_name"),
-			"call_type": call_type,
-			"metadata": metadata,
-			"timestamp": call_session["creation"]
-		},
-		user=to_user,
-		after_commit=True
+		event="f_icecore:incoming_call",  # Use colon like presence_update does
+		message=call_data,
+		after_commit=True  # Like presence_update does
 	)
+	print(f"✅✅✅ F-IceCore: publish_realtime completed!\n\n")
+
+	frappe.logger().info(f"✅ F-IceCore: Broadcasted incoming_call event")
 
 	return {
 		"success": True,
@@ -79,12 +92,13 @@ def accept_call(call_id):
 	call_doc.accepted_at = datetime.now()
 	call_doc.save(ignore_permissions=True)
 
+	# Broadcast to all users (like f_chat)
 	publish_realtime(
-		event="f_icecore:call_accepted",
-		message={"call_id": call_id, "accepted_by": user, "timestamp": datetime.now().isoformat()},
-		user=call_doc.from_user,
-		after_commit=True
+		event="call_accepted",
+		message={"call_id": call_id, "accepted_by": user, "from_user": call_doc.from_user, "to_user": call_doc.to_user, "timestamp": datetime.now().isoformat()}
 	)
+
+	frappe.logger().info(f"✅ F-IceCore: Broadcasted call_accepted event for {call_id}")
 
 	return {"success": True, "call_session": call_doc.as_dict()}
 
@@ -104,12 +118,14 @@ def reject_call(call_id, reason=None):
 	call_doc.save(ignore_permissions=True)
 
 	other_user = call_doc.from_user if user == call_doc.to_user else call_doc.to_user
+
+	# Broadcast to all users (like f_chat)
 	publish_realtime(
-		event="f_icecore:call_rejected",
-		message={"call_id": call_id, "rejected_by": user, "reason": reason, "timestamp": datetime.now().isoformat()},
-		user=other_user,
-		after_commit=True
+		event="call_rejected",
+		message={"call_id": call_id, "rejected_by": user, "reason": reason, "from_user": call_doc.from_user, "to_user": call_doc.to_user, "timestamp": datetime.now().isoformat()}
 	)
+
+	frappe.logger().info(f"✅ F-IceCore: Broadcasted call_rejected event for {call_id}")
 
 	return {"success": True}
 
@@ -128,12 +144,14 @@ def end_call(call_id):
 	call_doc.save(ignore_permissions=True)
 
 	other_user = call_doc.to_user if user == call_doc.from_user else call_doc.from_user
+
+	# Broadcast to all users (like f_chat)
 	publish_realtime(
-		event="f_icecore:call_ended",
-		message={"call_id": call_id, "ended_by": user, "timestamp": datetime.now().isoformat()},
-		user=other_user,
-		after_commit=True
+		event="call_ended",
+		message={"call_id": call_id, "ended_by": user, "from_user": call_doc.from_user, "to_user": call_doc.to_user, "timestamp": datetime.now().isoformat()}
 	)
+
+	frappe.logger().info(f"✅ F-IceCore: Broadcasted call_ended event for {call_id}")
 
 	return {"success": True}
 
