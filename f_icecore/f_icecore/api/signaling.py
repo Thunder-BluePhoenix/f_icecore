@@ -12,7 +12,7 @@ from datetime import datetime
 
 
 @frappe.whitelist()
-def initiate_call(to_user, call_type="audio", metadata=None):
+def initiate_call(to_user, call_type="audio", metadata=None, priority=0):
 	"""
 	Initiate a call to another user
 
@@ -20,6 +20,7 @@ def initiate_call(to_user, call_type="audio", metadata=None):
 		to_user: Target user to call
 		call_type: "audio", "video", or "screen"
 		metadata: Additional call metadata
+		priority: 1 for urgent/priority call, 0 for normal
 
 	Returns:
 		dict: Call session information
@@ -42,7 +43,7 @@ def initiate_call(to_user, call_type="audio", metadata=None):
 		}
 
 	# Create call session
-	call_session = create_call_session(from_user, to_user, call_type, metadata)
+	call_session = create_call_session(from_user, to_user, call_type, metadata, priority)
 
 	# Broadcast call to all users (like f_chat does)
 	# Client-side will filter who should receive it
@@ -55,6 +56,7 @@ def initiate_call(to_user, call_type="audio", metadata=None):
 		"from_user_name": frappe.db.get_value("User", from_user, "full_name"),
 		"to_user": to_user,  # Client-side will filter based on this
 		"call_type": call_type,
+		"priority": int(priority),  # Urgent/priority call flag
 		"metadata": metadata,
 		"timestamp": str(call_session["creation"])
 	}
@@ -92,13 +94,14 @@ def accept_call(call_id):
 	call_doc.accepted_at = datetime.now()
 	call_doc.save(ignore_permissions=True)
 
-	# Broadcast to all users (like f_chat)
+	# Notify the caller that call was accepted
 	publish_realtime(
-		event="call_accepted",
-		message={"call_id": call_id, "accepted_by": user, "from_user": call_doc.from_user, "to_user": call_doc.to_user, "timestamp": datetime.now().isoformat()}
+		event=f"f_icecore:call_accepted:{call_doc.from_user}",
+		message={"call_id": call_id, "accepted_by": user, "from_user": call_doc.from_user, "to_user": call_doc.to_user, "timestamp": datetime.now().isoformat()},
+		user=call_doc.from_user
 	)
 
-	frappe.logger().info(f"✅ F-IceCore: Broadcasted call_accepted event for {call_id}")
+	frappe.logger().info(f"✅ F-IceCore: Sent call_accepted event to {call_doc.from_user} for {call_id}")
 
 	return {"success": True, "call_session": call_doc.as_dict()}
 
@@ -119,13 +122,14 @@ def reject_call(call_id, reason=None):
 
 	other_user = call_doc.from_user if user == call_doc.to_user else call_doc.to_user
 
-	# Broadcast to all users (like f_chat)
+	# Notify the other user that call was rejected
 	publish_realtime(
-		event="call_rejected",
-		message={"call_id": call_id, "rejected_by": user, "reason": reason, "from_user": call_doc.from_user, "to_user": call_doc.to_user, "timestamp": datetime.now().isoformat()}
+		event=f"f_icecore:call_rejected:{other_user}",
+		message={"call_id": call_id, "rejected_by": user, "reason": reason, "from_user": call_doc.from_user, "to_user": call_doc.to_user, "timestamp": datetime.now().isoformat()},
+		user=other_user
 	)
 
-	frappe.logger().info(f"✅ F-IceCore: Broadcasted call_rejected event for {call_id}")
+	frappe.logger().info(f"✅ F-IceCore: Sent call_rejected event to {other_user} for {call_id}")
 
 	return {"success": True}
 
@@ -145,13 +149,14 @@ def end_call(call_id):
 
 	other_user = call_doc.to_user if user == call_doc.from_user else call_doc.from_user
 
-	# Broadcast to all users (like f_chat)
+	# Notify the other user that call ended
 	publish_realtime(
-		event="call_ended",
-		message={"call_id": call_id, "ended_by": user, "from_user": call_doc.from_user, "to_user": call_doc.to_user, "timestamp": datetime.now().isoformat()}
+		event=f"f_icecore:call_ended:{other_user}",
+		message={"call_id": call_id, "ended_by": user, "from_user": call_doc.from_user, "to_user": call_doc.to_user, "timestamp": datetime.now().isoformat()},
+		user=other_user
 	)
 
-	frappe.logger().info(f"✅ F-IceCore: Broadcasted call_ended event for {call_id}")
+	frappe.logger().info(f"✅ F-IceCore: Sent call_ended event to {other_user} for {call_id}")
 
 	return {"success": True}
 
@@ -197,13 +202,14 @@ def handle_signal(data):
 	pass
 
 
-def create_call_session(from_user, to_user, call_type, metadata):
+def create_call_session(from_user, to_user, call_type, metadata, priority=0):
 	"""Create a new call session document"""
 	doc = frappe.get_doc({
 		"doctype": "F IceCore Call Session",
 		"from_user": from_user,
 		"to_user": to_user,
 		"call_type": call_type,
+		"priority": int(priority),
 		"status": "Ringing",
 		"metadata": json.dumps(metadata) if metadata else None
 	})

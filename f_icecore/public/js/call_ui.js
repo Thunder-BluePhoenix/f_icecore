@@ -38,15 +38,36 @@ class FIceCoreCallUI {
 		frappe.realtime.on(`f_icecore:call_accepted:${user}`, (data) => {
 			console.log('Call accepted by:', data.accepted_by);
 			this.stopCallingTone();
+
+			// Show accepted notification
+			frappe.show_alert({
+				message: __('Call Accepted'),
+				indicator: 'green'
+			}, 3);
+
+			// Update the calling window to show accepted status
+			if (this.currentCallWindow) {
+				const callingContainer = this.currentCallWindow.$wrapper.find('.f-icecore-calling');
+				if (callingContainer.length) {
+					callingContainer.find('p').html(`
+						<i class="fa fa-check-circle" style="color: green;"></i> ${__('Call Accepted - Connecting...')}
+					`);
+				}
+			}
 		});
 
 		frappe.realtime.on(`f_icecore:call_rejected:${user}`, (data) => {
 			console.log('Call rejected by:', data.rejected_by);
 			this.stopCallingTone();
+
+			// Show rejected notification with reason
+			const reason = data.reason || 'Call declined';
 			frappe.show_alert({
-				message: __('Call was declined'),
+				message: `<strong>${__('Call Rejected')}</strong><br>${__(reason)}`,
 				indicator: 'red'
 			}, 5);
+
+			// Close the calling window
 			this.closeCallWindow();
 		});
 	}
@@ -66,7 +87,7 @@ class FIceCoreCallUI {
 		this.callingTone.loop = true;
 	}
 
-	async initiateCall(targetUser, callType = 'audio') {
+	async initiateCall(targetUser, callType = 'audio', priority = 0) {
 		try {
 			// Check if user is online
 			const presence = await this.getUserPresence(targetUser);
@@ -85,7 +106,8 @@ class FIceCoreCallUI {
 				method: 'f_icecore.f_icecore.api.signaling.initiate_call',
 				args: {
 					to_user: targetUser,
-					call_type: callType
+					call_type: callType,
+					priority: priority
 				}
 			});
 
@@ -115,25 +137,47 @@ class FIceCoreCallUI {
 	}
 
 	showIncomingCallDialog(callData) {
-		const { call_id, from_user, from_user_name, call_type } = callData;
+		const { call_id, from_user, from_user_name, call_type, priority } = callData;
 
 		const callTypeIcon = call_type === 'video' ? '📹' : (call_type === 'screen' ? '🖥️' : '📞');
+		const isUrgent = priority === 1 || priority === true;
+
+		// Different styling for urgent calls
+		const urgentStyle = isUrgent ? 'border: 3px solid #ff4444; animation: pulse 1.5s infinite;' : '';
+		const urgentBadge = isUrgent ? '<span style="background: #ff4444; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; margin-bottom: 15px; display: inline-block;">⚠️ URGENT CALL</span>' : '';
+		const urgentClass = isUrgent ? 'f-icecore-urgent-call' : '';
 
 		this.incomingCallDialog = new frappe.ui.Dialog({
-			title: __('Incoming Call'),
+			title: isUrgent ? __('🚨 Urgent Incoming Call') : __('Incoming Call'),
 			static: true,
 			fields: [
 				{
 					fieldtype: 'HTML',
 					options: `
-						<div class="f-icecore-incoming-call" style="text-align: center; padding: 30px;">
+						<style>
+							@keyframes pulse {
+								0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7); }
+								50% { box-shadow: 0 0 0 15px rgba(255, 68, 68, 0); }
+								100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+							}
+							.f-icecore-urgent-call {
+								animation: shake 0.5s infinite;
+							}
+							@keyframes shake {
+								0%, 100% { transform: translateX(0); }
+								25% { transform: translateX(-5px); }
+								75% { transform: translateX(5px); }
+							}
+						</style>
+						<div class="f-icecore-incoming-call ${urgentClass}" style="text-align: center; padding: 30px; ${urgentStyle}">
+							${urgentBadge}
 							<div class="caller-avatar" style="margin-bottom: 20px;">
 								<img src="${frappe.utils.get_avatar(from_user)}"
-									style="width: 80px; height: 80px; border-radius: 50%;">
+									style="width: 80px; height: 80px; border-radius: 50%; ${isUrgent ? 'border: 3px solid #ff4444;' : ''}">
 							</div>
 							<h3 style="margin-bottom: 10px;">${from_user_name}</h3>
 							<p style="color: #888; margin-bottom: 30px;">
-								${callTypeIcon} ${__(callType.charAt(0).toUpperCase() + callType.slice(1))} Call
+								${callTypeIcon} ${__(call_type.charAt(0).toUpperCase() + call_type.slice(1))} Call
 							</p>
 							<div class="call-actions" style="display: flex; justify-content: center; gap: 20px;">
 								<button class="btn btn-success btn-lg" onclick="window.FIceCoreUI.acceptCall('${call_id}', '${from_user}', '${call_type}')">
@@ -150,6 +194,13 @@ class FIceCoreCallUI {
 		});
 
 		this.incomingCallDialog.show();
+
+		// For urgent calls, also play a more urgent ringtone or vibrate pattern
+		if (isUrgent) {
+			console.log('🚨 Urgent call - using priority ringtone');
+			// You could load a different ringtone here if available
+			// this.ringtone = new Audio('/assets/f_icecore/sounds/urgent_ringtone.mp3');
+		}
 	}
 
 	async acceptCall(callId, fromUser, callType) {

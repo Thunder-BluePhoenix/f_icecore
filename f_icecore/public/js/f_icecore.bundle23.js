@@ -112,12 +112,20 @@ function showQuickCallDialog() {
 				options: 'Audio\nVideo',
 				default: 'Audio',
 				reqd: 1
+			},
+			{
+				fieldtype: 'Check',
+				fieldname: 'priority',
+				label: __('Urgent/Priority Call'),
+				default: 0,
+				description: __('Mark this as an urgent call (will show special notification to receiver)')
 			}
 		],
 		primary_action_label: __('Call'),
 		primary_action: (values) => {
 			const callType = values.call_type.toLowerCase();
-			window.FIceCoreUI.initiateCall(values.user, callType);
+			const priority = values.priority ? 1 : 0;
+			window.FIceCoreUI.initiateCall(values.user, callType, priority);
 			dialog.hide();
 		}
 	});
@@ -126,7 +134,21 @@ function showQuickCallDialog() {
 }
 
 // Extend FIceCoreCallUI with additional methods
-window.FIceCoreUI.showCallMenu = function() {
+// Ensure FIceCoreUI exists before extending
+if (typeof window.FIceCoreUI === 'undefined') {
+	console.error('F-IceCore: FIceCoreUI not initialized yet. Waiting...');
+	// Retry after a short delay
+	setTimeout(() => {
+		if (typeof window.FIceCoreUI !== 'undefined') {
+			setupCallMenu();
+		}
+	}, 100);
+} else {
+	setupCallMenu();
+}
+
+function setupCallMenu() {
+	window.FIceCoreUI.showCallMenu = function() {
 	// Show call menu with online users and call history
 	const dialog = new frappe.ui.Dialog({
 		title: __('F-IceCore Calls'),
@@ -180,7 +202,8 @@ window.FIceCoreUI.showCallMenu = function() {
 
 	// Load call stats on tab click
 	$('a[href="#call-stats"]').on('shown.bs.tab', loadCallStats);
-};
+	};
+}
 
 function loadOnlineUsers() {
 	frappe.call({
