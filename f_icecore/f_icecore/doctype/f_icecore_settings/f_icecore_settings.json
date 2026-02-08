@@ -22,6 +22,7 @@
   "enable_audio_calls",
   "enable_video_calls",
   "enable_screen_sharing",
+  "max_group_call_participants",
   "column_break_14",
   "max_call_duration",
   "enable_call_history",
@@ -147,6 +148,13 @@
    "description": "Allow users to share their screen during calls"
   },
   {
+   "default": "5",
+   "fieldname": "max_group_call_participants",
+   "fieldtype": "Int",
+   "label": "Max Group Call Participants",
+   "description": "Maximum number of participants allowed in a group call (default: 5, max recommended: 8)"
+  },
+  {
    "fieldname": "column_break_14",
    "fieldtype": "Column Break"
   },
@@ -211,7 +219,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-11-16 00:00:00",
+ "modified": "2025-02-09 10:00:00",
  "modified_by": "Administrator",
  "module": "F Icecore",
  "name": "F IceCore Settings",

@@ -1,0 +1,110 @@
+{
+ "actions": [],
+ "autoname": "format:GCALL-{YYYY}-{#####}",
+ "creation": "2025-02-09 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "initiator",
+  "call_type",
+  "status",
+  "column_break_1",
+  "max_participants",
+  "created_at",
+  "ended_at",
+  "duration",
+  "end_reason",
+  "metadata",
+  "participants_section",
+  "participants"
+ ],
+ "fields": [
+  {
+   "fieldname": "initiator",
+   "fieldtype": "Link",
+   "label": "Initiator",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "call_type",
+   "fieldtype": "Select",
+   "label": "Call Type",
+   "options": "audio\nvideo",
+   "reqd": 1
+  },
+  {
+   "default": "Ringing",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Ringing\nActive\nEnded"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "5",
+   "fieldname": "max_participants",
+   "fieldtype": "Int",
+   "label": "Max Participants"
+  },
+  {
+   "fieldname": "created_at",
+   "fieldtype": "Datetime",
+   "label": "Created At"
+  },
+  {
+   "fieldname": "ended_at",
+   "fieldtype": "Datetime",
+   "label": "Ended At"
+  },
+  {
+   "fieldname": "duration",
+   "fieldtype": "Int",
+   "label": "Duration (seconds)"
+  },
+  {
+   "fieldname": "end_reason",
+   "fieldtype": "Small Text",
+   "label": "End Reason"
+  },
+  {
+   "fieldname": "metadata",
+   "fieldtype": "Long Text",
+   "label": "Metadata"
+  },
+  {
+   "fieldname": "participants_section",
+   "fieldtype": "Section Break",
+   "label": "Participants"
+  },
+  {
+   "fieldname": "participants",
+   "fieldtype": "Table",
+   "label": "Participants",
+   "options": "F IceCore Group Call Participant"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2025-02-09 00:00:00",
+ "modified_by": "Administrator",
+ "module": "F Icecore",
+ "name": "F IceCore Group Call Session",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "role": "All",
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

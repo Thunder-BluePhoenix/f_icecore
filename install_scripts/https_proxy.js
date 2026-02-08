@@ -9,12 +9,10 @@
  *
  * IMPORTANT: Rewrites host/origin headers for SocketIO so Frappe's
  * authenticate middleware maps to default_site (ice1).
+ * Also rewrites CORS response headers so the browser accepts responses.
  *
  * This enables getUserMedia() on mobile devices connected via IP address,
  * which requires a secure context (HTTPS).
- *
- * Also enables SocketIO to work from mobile (via header rewriting),
- * solving the "Invalid namespace" / "Invalid origin" authentication errors.
  *
  * Usage: node https_proxy.js
  */
@@ -72,8 +70,27 @@ function rewriteHeadersForSocketIO(headers) {
     return rewritten;
 }
 
+// --- Helper: Rewrite CORS response headers ---
+// SocketIO server echoes back the rewritten origin (http://127.0.0.1:8002)
+// in Access-Control-Allow-Origin, but the browser's actual origin is
+// https://192.168.31.223:8443. We must fix this mismatch.
+function fixCorsHeaders(responseHeaders, clientOrigin) {
+    const fixed = { ...responseHeaders };
+    if (clientOrigin && fixed['access-control-allow-origin']) {
+        fixed['access-control-allow-origin'] = clientOrigin;
+    }
+    // Ensure credentials are allowed (needed for cookies/sid)
+    if (fixed['access-control-allow-origin']) {
+        fixed['access-control-allow-credentials'] = 'true';
+    }
+    return fixed;
+}
+
 // --- Helper: Proxy HTTP request ---
 function proxyRequest(clientReq, clientRes, targetPort, rewriteHeaders) {
+    // Save the client's real origin for CORS fixing
+    const clientOrigin = clientReq.headers['origin'];
+
     const headers = rewriteHeaders
         ? rewriteHeadersForSocketIO(clientReq.headers)
         : {
@@ -92,7 +109,12 @@ function proxyRequest(clientReq, clientRes, targetPort, rewriteHeaders) {
     };
 
     const proxyReq = http.request(options, (proxyRes) => {
-        clientRes.writeHead(proxyRes.statusCode, proxyRes.headers);
+        // Fix CORS headers in the response if we rewrote the request headers
+        const responseHeaders = rewriteHeaders
+            ? fixCorsHeaders(proxyRes.headers, clientOrigin)
+            : proxyRes.headers;
+
+        clientRes.writeHead(proxyRes.statusCode, responseHeaders);
         proxyRes.pipe(clientRes, { end: true });
     });
 
@@ -158,9 +180,23 @@ webProxy.listen(WEB_HTTPS_PORT, BIND_HOST, () => {
 
 // --- 2. WSS SocketIO Proxy (port 9443 → 9002) ---
 // IMPORTANT: Rewrites host/origin headers so Frappe authenticate middleware
-// sees 127.0.0.1 and maps to default_site. This fixes the "Invalid namespace"
-// error that occurs when connecting from IP addresses.
+// sees 127.0.0.1 and maps to default_site. Also fixes CORS response headers
+// so the browser accepts the response (replaces the rewritten origin with
+// the client's actual origin in Access-Control-Allow-Origin).
 const socketProxy = https.createServer(sslOptions, (req, res) => {
+    // Handle CORS preflight (OPTIONS) requests directly
+    if (req.method === 'OPTIONS') {
+        const origin = req.headers['origin'] || '*';
+        res.writeHead(204, {
+            'Access-Control-Allow-Origin': origin,
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': req.headers['access-control-request-headers'] || '*',
+            'Access-Control-Allow-Credentials': 'true',
+            'Access-Control-Max-Age': '86400',
+        });
+        res.end();
+        return;
+    }
     // SocketIO also does HTTP long-polling, so proxy regular requests too
     proxyRequest(req, res, SOCKETIO_HTTP_PORT, true);
 });
@@ -173,7 +209,7 @@ socketProxy.on('upgrade', (req, socket, head) => {
 socketProxy.listen(SOCKETIO_HTTPS_PORT, BIND_HOST, () => {
     console.log(`🔒 F-IceCore WSS SocketIO Proxy`);
     console.log(`   wss://0.0.0.0:${SOCKETIO_HTTPS_PORT} → ws://127.0.0.1:${SOCKETIO_HTTP_PORT}`);
-    console.log(`   (headers rewritten: host→127.0.0.1, origin→127.0.0.1)`);
+    console.log(`   (headers rewritten + CORS fixed)`);
     console.log(`\n📱 Mobile Access URLs:`);
     console.log(`   Web:      https://192.168.31.223:${WEB_HTTPS_PORT}`);
     console.log(`   SocketIO: wss://192.168.31.223:${SOCKETIO_HTTPS_PORT}`);
