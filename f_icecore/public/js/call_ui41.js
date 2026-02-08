@@ -71,23 +71,47 @@ class FIceCoreCallUI {
 		console.log('🎧 F-IceCore: Setting up incoming call listener');
 
 		const user = frappe.session.user;
+		console.log('🎧 F-IceCore: Current user:', user);
+		console.log('🎧 F-IceCore: Socket connected:', frappe.socketio?.socket?.connected);
+
+		// Debug: Listen for ALL events to see what's coming through
+		if (frappe.socketio?.socket) {
+			const origOnevent = frappe.socketio.socket.onevent;
+			frappe.socketio.socket.onevent = function(packet) {
+				const eventName = packet.data ? packet.data[0] : 'unknown';
+				if (eventName && eventName.includes('f_icecore')) {
+					console.log('🔍 F-IceCore RAW socket event:', eventName, packet.data[1]);
+				}
+				origOnevent.call(this, packet);
+			};
+			console.log('🔍 F-IceCore: Installed raw socket event interceptor');
+		}
+
 		const eventName = 'f_icecore:incoming_call';
 		console.log('🎧 F-IceCore: Registering listener for event:', eventName);
 
 		try {
+			// Register via frappe.realtime.on
 			frappe.realtime.on(eventName, (data) => {
-				console.log('🔔 F-IceCore: incoming_call event received!', data);
+				console.log('🔔🔔🔔 F-IceCore: incoming_call event received!', data);
+				console.log('🔔 to_user:', data.to_user, 'current user:', user);
 
-				// Check if this call is for the current user
-				if (data.to_user === user) {
-					console.log('✅ This call is for me!');
-					this.handleIncomingCall(data);
-				} else {
-					console.log('ℹ️  This call is not for me');
-				}
+				// Since we now send with user=to_user, the event only arrives
+				// for the intended recipient. No need to filter.
+				this.handleIncomingCall(data);
 			});
 
 			console.log('✅ F-IceCore: incoming_call listener registered!');
+
+			// Also register test_ping listener for debugging
+			frappe.realtime.on('f_icecore:test_ping', (data) => {
+				console.log('🧪🧪🧪 F-IceCore: TEST PING RECEIVED!', data);
+				frappe.show_alert({
+					message: `Test ping from ${data.from_user}!`,
+					indicator: 'green'
+				}, 5);
+			});
+			console.log('🧪 F-IceCore: test_ping listener registered');
 
 		} catch (error) {
 			console.error('❌ F-IceCore: Failed to register listener:', error);
@@ -102,6 +126,13 @@ class FIceCoreCallUI {
 					message: __('Call accepted! Connecting...'),
 					indicator: 'green'
 				}, 3);
+
+				// Transition caller from "Calling..." window to actual call window
+				const callType = window.FIceCore?.callType || 'audio';
+				const callId = data.call_id;
+				const remoteUser = data.accepted_by || data.to_user;
+				console.log('📞 Switching to call window for caller. Remote:', remoteUser, 'Type:', callType);
+				this.showCallWindow(remoteUser, callType, callId, true);
 			}
 			this.removePendingCall(data.call_id);
 		});
@@ -136,9 +167,6 @@ class FIceCoreCallUI {
 	handleIncomingCall(data) {
 		console.log('🔔 Handling incoming call:', data);
 
-		// Check if call is urgent
-		const isUrgent = data.is_urgent === true || data.is_urgent === 1;
-		
 		// Add to pending calls
 		this.addPendingCall(data);
 
@@ -147,23 +175,12 @@ class FIceCoreCallUI {
 
 		// Show desktop notification
 		const callTypeText = data.call_type.charAt(0).toUpperCase() + data.call_type.slice(1);
-		this.showDesktopNotification(data.from_user_name, callTypeText, isUrgent);
+		this.showDesktopNotification(data.from_user_name, callTypeText, true);
 
-		// If urgent, show popup immediately
-		if (isUrgent) {
-			console.log('🚨 URGENT CALL - Showing popup immediately');
-			this.showIncomingCallDialog(data);
-		} else {
-			// For non-urgent calls, just show green dot notification
-			console.log('💚 Non-urgent call - Showing green dot notification');
-			this.updateNavbarNotification();
-			
-			// Show toast notification
-			frappe.show_alert({
-				message: __(`Incoming ${callTypeText} call from ${data.from_user_name}`),
-				indicator: 'blue'
-			}, 10);
-		}
+		// ALWAYS show popup dialog immediately so user can accept/decline
+		console.log('📞 Showing incoming call popup dialog');
+		this.updateNavbarNotification();
+		this.showIncomingCallDialog(data);
 	}
 
 	updateNavbarNotification() {
@@ -344,6 +361,14 @@ class FIceCoreCallUI {
 			// Remove from pending calls
 			this.removePendingCall(callId);
 
+			// Request microphone/camera permission FIRST for the recipient too
+			console.log('🎤 Requesting media permission for recipient...');
+			const hasPermission = await window.FIceCore.requestMediaPermission(callType);
+			if (!hasPermission) {
+				console.warn('⚠️ Media permission denied for recipient, proceeding anyway (one-way audio)');
+				// Don't block the call - the caller can still hear nothing but at least call connects
+			}
+
 			// Accept call in backend
 			const response = await frappe.call({
 				method: 'f_icecore.f_icecore.api.signaling.accept_call',
@@ -444,6 +469,10 @@ class FIceCoreCallUI {
 					<div class="video-container" style="position: relative; background: #000; border-radius: 8px; overflow: hidden; height: 500px;">
 						<video id="remote-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
 						<video id="local-video" autoplay playsinline muted style="position: absolute; bottom: 20px; right: 20px; width: 200px; height: 150px; object-fit: cover; border: 3px solid white; border-radius: 8px;"></video>
+						<div style="position: absolute; top: 15px; left: 15px; color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.8); z-index: 10;">
+							<span id="call-status" style="font-size: 14px;">Connecting...</span>
+							<span id="call-duration" style="font-size: 14px; margin-left: 10px;">00:00</span>
+						</div>
 					</div>
 				`;
 			} else {
@@ -453,7 +482,7 @@ class FIceCoreCallUI {
 							${frappe.avatar(remoteUser, 'avatar-xxlarge')}
 						</div>
 						<h2 style="margin-bottom: 15px;">${userName}</h2>
-						<p id="call-status" style="color: #888; font-size: 18px; margin-bottom: 10px;">Connected</p>
+						<p id="call-status" style="color: #888; font-size: 18px; margin-bottom: 10px;">Connecting...</p>
 						<p id="call-duration" style="font-size: 24px; font-weight: bold; color: #333;">00:00</p>
 					</div>
 				`;
@@ -484,28 +513,42 @@ class FIceCoreCallUI {
 
 			$content.html(contentHtml);
 
-			// Start duration timer for audio calls
-			if (!hasVideo) {
-				this.startDurationTimer();
-			}
+			// Timer will be started by webrtc_engine when connection state reaches 'connected'
+			// Don't start it here — the call isn't actually connected yet
 
-			// Attach video streams after a short delay
-			setTimeout(() => {
-				if (hasVideo && window.FIceCore) {
-					const localVideo = document.getElementById('local-video');
-					const remoteVideo = document.getElementById('remote-video');
+			// Reactively attach streams - check periodically until both are attached
+			// Streams may arrive at different times (local immediately, remote after ICE negotiation)
+			this._streamAttachAttempts = 0;
+			this._streamAttachInterval = setInterval(() => {
+				this._streamAttachAttempts++;
+				let localAttached = false;
+				let remoteAttached = false;
 
-					if (localVideo && window.FIceCore.localStream) {
-						localVideo.srcObject = window.FIceCore.localStream;
-						console.log('✅ Attached local stream to video element');
+				if (window.FIceCore) {
+					// Attach local stream
+					if (window.FIceCore.localStream) {
+						window.FIceCore.attachLocalStream();
+						localAttached = true;
 					}
 
-					if (remoteVideo && window.FIceCore.remoteStream) {
-						remoteVideo.srcObject = window.FIceCore.remoteStream;
-						console.log('✅ Attached remote stream to video element');
+					// Attach remote stream
+					if (window.FIceCore.remoteStream) {
+						window.FIceCore.attachRemoteStream();
+						remoteAttached = true;
 					}
 				}
-			}, 200);
+
+				// Stop checking once both are attached or after 60 seconds
+				if ((localAttached && remoteAttached) || this._streamAttachAttempts > 120) {
+					clearInterval(this._streamAttachInterval);
+					this._streamAttachInterval = null;
+					if (localAttached && remoteAttached) {
+						console.log('✅ Both local and remote streams attached successfully');
+					} else {
+						console.warn('⚠️ Stream attach timeout. Local:', localAttached, 'Remote:', remoteAttached);
+					}
+				}
+			}, 500);
 
 		}, 100);
 	}
@@ -516,6 +559,9 @@ class FIceCoreCallUI {
 
 		console.log('📞 Showing calling window for:', userName);
 
+		// Store callId for cancel button reference
+		this._currentCallingCallId = callId;
+
 		this.currentCallWindow = new frappe.ui.Dialog({
 			title: `${callTypeIcon} ${__('Calling')} ${userName}...`,
 			static: true,
@@ -523,33 +569,48 @@ class FIceCoreCallUI {
 			fields: [
 				{
 					fieldtype: 'HTML',
-					fieldname: 'calling_content',
-					options: `
-						<div style="text-align: center; padding: 40px;">
-							<div style="margin-bottom: 30px;">
-								${frappe.avatar(targetUser, 'avatar-xlarge')}
-							</div>
-							<h2 style="margin-bottom: 10px;">${userName}</h2>
-							<p style="color: #888; font-size: 18px;">${__('Calling')}...</p>
-							<div style="margin-top: 40px;">
-								<button class="btn btn-danger btn-lg" onclick="window.FIceCoreUI.cancelCall('${callId}')">
-									<i class="fa fa-phone-slash"></i> ${__('Cancel')}
-								</button>
-							</div>
-						</div>
-					`
+					fieldname: 'calling_content'
 				}
 			]
 		});
 
 		this.currentCallWindow.show();
+
+		// Set content after dialog renders to avoid microtemplate escaping issues
+		setTimeout(() => {
+			const $content = this.currentCallWindow.fields_dict.calling_content.$wrapper;
+			$content.html(`
+				<div style="text-align: center; padding: 40px;">
+					<div style="margin-bottom: 30px;">
+						${frappe.avatar(targetUser, 'avatar-xlarge')}
+					</div>
+					<h2 style="margin-bottom: 10px;">${userName}</h2>
+					<p style="color: #888; font-size: 18px;">${__('Calling')}...</p>
+					<div style="margin-top: 40px;">
+						<button class="btn btn-danger btn-lg" id="f-icecore-cancel-call-btn">
+							<i class="fa fa-phone-slash"></i> ${__('Cancel')}
+						</button>
+					</div>
+				</div>
+			`);
+			// Attach click handler directly (avoids quote escaping issues in onclick)
+			$content.find('#f-icecore-cancel-call-btn').on('click', () => {
+				window.FIceCoreUI.cancelCall(callId);
+			});
+		}, 50);
 	}
 
 	async cancelCall(callId) {
 		try {
 			console.log('❌ Cancelling call...');
-			
+
 			this.stopCallingTone();
+
+			// Stop stream attach polling
+			if (this._streamAttachInterval) {
+				clearInterval(this._streamAttachInterval);
+				this._streamAttachInterval = null;
+			}
 			
 			if (this.currentCallWindow) {
 				this.currentCallWindow.hide();
@@ -578,6 +639,12 @@ class FIceCoreCallUI {
 			this.stopCallingTone();
 			this.stopDurationTimer();
 
+			// Stop stream attach polling
+			if (this._streamAttachInterval) {
+				clearInterval(this._streamAttachInterval);
+				this._streamAttachInterval = null;
+			}
+
 			if (this.currentCallWindow) {
 				this.currentCallWindow.hide();
 				this.currentCallWindow = null;
@@ -599,10 +666,16 @@ class FIceCoreCallUI {
 
 	handleCallEnded() {
 		console.log('📵 Handling call ended');
-		
+
 		this.stopRingtone();
 		this.stopCallingTone();
 		this.stopDurationTimer();
+
+		// Stop stream attach polling
+		if (this._streamAttachInterval) {
+			clearInterval(this._streamAttachInterval);
+			this._streamAttachInterval = null;
+		}
 
 		if (this.incomingCallDialog) {
 			this.incomingCallDialog.hide();
@@ -616,9 +689,21 @@ class FIceCoreCallUI {
 	}
 
 	startDurationTimer() {
-		const durationEl = document.getElementById('call-duration');
-		if (!durationEl) return;
+		// Prevent duplicate timers
+		if (this.durationInterval) {
+			console.log('⏱️ Timer already running, skipping');
+			return;
+		}
 
+		const durationEl = document.getElementById('call-duration');
+		if (!durationEl) {
+			console.log('⏱️ call-duration element not found, retrying in 500ms...');
+			// Retry after DOM renders
+			setTimeout(() => this.startDurationTimer(), 500);
+			return;
+		}
+
+		console.log('⏱️ Starting call duration timer');
 		let seconds = 0;
 		this.durationInterval = setInterval(() => {
 			seconds++;
@@ -771,6 +856,15 @@ class FIceCoreCallUI {
 				return;
 			}
 
+			// Request microphone/camera permission FIRST before doing anything else
+			console.log('🎤 Requesting media permission before call...');
+			const hasPermission = await window.FIceCore.requestMediaPermission(callType);
+			if (!hasPermission) {
+				console.log('❌ Media permission denied, aborting call');
+				return;
+			}
+			console.log('✅ Media permission granted, proceeding with call');
+
 			// Check if user is online
 			const presence = await this.getUserPresence(targetUser);
 			if (presence.status === 'offline') {
@@ -802,7 +896,7 @@ class FIceCoreCallUI {
 			// Show calling window
 			this.showCallingWindow(targetUser, callType, callSession.name);
 
-			// Start WebRTC call
+			// Start WebRTC call (getUserMedia + create offer + send offer)
 			await window.FIceCore.startCall(targetUser, callType, callSession.name);
 
 			// Play calling tone
