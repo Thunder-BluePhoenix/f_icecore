@@ -170,12 +170,20 @@ class FIceCoreWebRTC {
 				// in the queue, but we need the answer first to set remoteDescription.
 				const priority = {
 					'f_icecore:incoming_call': 0,
+					'f_icecore:incoming_group_call': 0,
+				'f_icecore:upgrade_to_group_call': 0,
 					'call_accepted': 1,
+					'f_icecore:group_participant_joined': 1,
 					'f_icecore:webrtc_offer': 2,
+					'f_icecore:group_webrtc_offer': 2,
 					'f_icecore:webrtc_answer': 3,
+					'f_icecore:group_webrtc_answer': 3,
 					'f_icecore:ice_candidate': 4,
+					'f_icecore:group_ice_candidate': 4,
 					'call_rejected': 5,
 					'call_ended': 6,
+					'f_icecore:group_participant_left': 6,
+					'f_icecore:group_call_ended': 6,
 					'f_icecore:test_ping': 7
 				};
 				signals.sort((a, b) => {
@@ -288,6 +296,66 @@ class FIceCoreWebRTC {
 				}, 5);
 				break;
 
+			// ============================================================
+			// Group Call Events (dispatched to FIceCoreGroup engine)
+			// ============================================================
+
+			case 'f_icecore:incoming_group_call':
+				console.log('📡 [POLL] Incoming group call from:', message.initiator);
+				if (window.FIceCoreUI && window.FIceCoreUI.handleIncomingGroupCall) {
+					window.FIceCoreUI.handleIncomingGroupCall(message);
+				}
+				break;
+
+			case 'f_icecore:upgrade_to_group_call':
+				console.log('📡 [POLL] Upgrade to group call:', message.group_call_id);
+				if (window.FIceCoreUI && window.FIceCoreUI.handleUpgradeToGroupCall) {
+					window.FIceCoreUI.handleUpgradeToGroupCall(message);
+				}
+				break;
+
+			case 'f_icecore:group_participant_joined':
+				console.log('📡 [POLL] Group participant joined:', message.user);
+				if (window.FIceCoreGroup) {
+					await window.FIceCoreGroup.handleParticipantJoined(message);
+				}
+				break;
+
+			case 'f_icecore:group_participant_left':
+				console.log('📡 [POLL] Group participant left:', message.user);
+				if (window.FIceCoreGroup) {
+					window.FIceCoreGroup.handleParticipantLeft(message);
+				}
+				break;
+
+			case 'f_icecore:group_call_ended':
+				console.log('📡 [POLL] Group call ended:', message.reason);
+				if (window.FIceCoreGroup) {
+					window.FIceCoreGroup.handleGroupCallEnded(message);
+				}
+				break;
+
+			case 'f_icecore:group_webrtc_offer':
+				console.log('📡 [POLL] Group WebRTC offer from:', message.from_user);
+				if (window.FIceCoreGroup) {
+					await window.FIceCoreGroup.handleGroupOffer(message);
+				}
+				break;
+
+			case 'f_icecore:group_webrtc_answer':
+				console.log('📡 [POLL] Group WebRTC answer from:', message.from_user);
+				if (window.FIceCoreGroup) {
+					await window.FIceCoreGroup.handleGroupAnswer(message);
+				}
+				break;
+
+			case 'f_icecore:group_ice_candidate':
+				console.log('📡 [POLL] Group ICE candidate from:', message.from_user);
+				if (window.FIceCoreGroup) {
+					await window.FIceCoreGroup.handleGroupIceCandidate(message);
+				}
+				break;
+
 			default:
 				console.log(`📡 [POLL] Unknown signal event: ${event}`);
 				break;
@@ -359,9 +427,20 @@ class FIceCoreWebRTC {
 	 * Store incoming offer without answering.
 	 * The offer will be answered only when user clicks "Accept".
 	 * Also resolves any pending waitForOffer promise.
+	 *
+	 * IMPORTANT: If we already have an active peer connection with this user
+	 * (same call_id), this is a mid-call renegotiation (e.g. screen share
+	 * track added). Handle it automatically instead of storing.
 	 */
 	storePendingOffer(data) {
 		try {
+			// Check if this is a mid-call renegotiation (same call, active peer connection)
+			if (this.peerConnection && this.callId === data.call_id && this.remoteUser === data.from_user) {
+				console.log('🔄 Mid-call renegotiation offer from:', data.from_user);
+				this.handleRenegotiationOffer(data);
+				return;
+			}
+
 			console.log('📥 Storing pending offer from:', data.from_user);
 
 			this.pendingOfferData = data;
@@ -385,6 +464,59 @@ class FIceCoreWebRTC {
 		} catch (error) {
 			console.error('❌ Failed to store pending offer:', error);
 			this.handleError(error);
+		}
+	}
+
+	/**
+	 * Handle a mid-call renegotiation offer.
+	 * This happens when the remote peer adds/removes tracks (e.g. screen share).
+	 * We automatically set the new remote description and send an answer.
+	 */
+	async handleRenegotiationOffer(data) {
+		try {
+			const offer = JSON.parse(data.offer);
+			console.log('🔄 Setting renegotiation remote description...');
+
+			await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+
+			// Create and send answer for the renegotiation
+			const answer = await this.peerConnection.createAnswer();
+			await this.peerConnection.setLocalDescription(answer);
+
+			console.log('🔄 Sending renegotiation answer to:', this.remoteUser);
+			await frappe.call({
+				method: 'f_icecore.f_icecore.api.signaling.send_answer',
+				args: {
+					to_user: this.remoteUser,
+					answer_sdp: JSON.stringify(answer),
+					call_id: this.callId
+				}
+			});
+
+			// Process any pending ICE candidates
+			await this.processPendingIceCandidates();
+
+			// Force re-attach streams to update video elements.
+			// After renegotiation, the video element may need a srcObject kick
+			// to display the new track content (screen share vs camera).
+			setTimeout(() => {
+				this.attachRemoteStream();
+				this.attachLocalStream();
+
+				// Also ensure video container exists for audio-only calls getting screen share
+				if (window.FIceCoreUI) {
+					window.FIceCoreUI._ensureVideoContainerForScreenShare();
+					// Re-attach after container is created
+					setTimeout(() => {
+						this.attachRemoteStream();
+					}, 100);
+				}
+			}, 200);
+
+			console.log('✅ Renegotiation complete — remote screen share should now be visible');
+
+		} catch (error) {
+			console.error('❌ Renegotiation failed:', error);
 		}
 	}
 
@@ -993,10 +1125,253 @@ class FIceCoreWebRTC {
 	}
 
 	// ============================================================
+	// Mid-call Screen Sharing (toggle on/off)
+	// ============================================================
+
+	/**
+	 * Start screen sharing mid-call.
+	 * Replaces the current video track (camera) with the screen capture track
+	 * on the existing peer connection. No renegotiation needed.
+	 *
+	 * For audio-only calls, adds a video track to the peer connection.
+	 *
+	 * Returns true on success, false on failure/cancel.
+	 */
+	async startScreenShare() {
+		try {
+			if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+				console.error('❌ getDisplayMedia not available');
+				frappe.show_alert({
+					message: __('Screen sharing is not available. Use HTTPS for screen sharing.'),
+					indicator: 'red'
+				}, 5);
+				return false;
+			}
+
+			if (!this.peerConnection) {
+				console.error('❌ No active peer connection for screen share');
+				return false;
+			}
+
+			console.log('🖥️ Starting screen share...');
+
+			// Get screen capture stream
+			const screenStream = await navigator.mediaDevices.getDisplayMedia({
+				video: {
+					cursor: 'always',
+					width: { ideal: 1920 },
+					height: { ideal: 1080 },
+					frameRate: { ideal: 30 }
+				},
+				audio: false
+			});
+
+			const screenTrack = screenStream.getVideoTracks()[0];
+			if (!screenTrack) {
+				console.error('❌ No video track from getDisplayMedia');
+				return false;
+			}
+
+			// Save the current camera track so we can restore it later
+			this._savedCameraTrack = null;
+			if (this.localStream) {
+				const cameraTrack = this.localStream.getVideoTracks()[0];
+				if (cameraTrack) {
+					this._savedCameraTrack = cameraTrack;
+				}
+			}
+
+			// Find the video sender on the peer connection and replace its track
+			const videoSender = this.peerConnection.getSenders().find(s =>
+				s.track && s.track.kind === 'video'
+			);
+
+			if (videoSender) {
+				// Replace existing video track with screen track
+				await videoSender.replaceTrack(screenTrack);
+				console.log('✅ Replaced camera track with screen track on sender');
+			} else {
+				// No video sender yet (audio-only call) — add screen track
+				this.peerConnection.addTrack(screenTrack, screenStream);
+				console.log('✅ Added screen track to peer connection (was audio-only)');
+			}
+
+			// Always renegotiate so the remote side updates its video rendering.
+			// For video calls: replaceTrack alone may not update the remote display.
+			// For audio-only calls: new track requires renegotiation anyway.
+			const offer = await this.peerConnection.createOffer();
+			await this.peerConnection.setLocalDescription(offer);
+			await frappe.call({
+				method: 'f_icecore.f_icecore.api.signaling.send_offer',
+				args: {
+					to_user: this.remoteUser,
+					offer_sdp: JSON.stringify(offer),
+					call_id: this.callId
+				}
+			});
+			console.log('📤 Sent renegotiation offer for screen share');
+
+			// Update local stream reference
+			if (!this.localStream) {
+				this.localStream = new MediaStream();
+			}
+			// Remove old video track from localStream, add screen track
+			this.localStream.getVideoTracks().forEach(t => {
+				if (t !== screenTrack) {
+					this.localStream.removeTrack(t);
+				}
+			});
+			this.localStream.addTrack(screenTrack);
+
+			// Update local video preview to show screen share
+			this.attachLocalStream();
+
+			// Store screen stream reference for cleanup
+			this._screenStream = screenStream;
+			this._isScreenSharing = true;
+
+			// Listen for user stopping screen share via browser's built-in "Stop sharing" button
+			screenTrack.onended = () => {
+				console.log('🖥️ User stopped screen sharing via browser UI');
+				this.stopScreenShare();
+				// Notify CallUI to update button state
+				if (window.FIceCoreUI) {
+					window.FIceCoreUI._updateScreenShareButton(false);
+				}
+			};
+
+			console.log('✅ Screen sharing started successfully');
+			return true;
+
+		} catch (error) {
+			if (error.name === 'NotAllowedError') {
+				console.log('🖥️ User cancelled screen share picker');
+			} else {
+				console.error('❌ Failed to start screen share:', error);
+				frappe.show_alert({
+					message: __('Failed to start screen sharing: ') + error.message,
+					indicator: 'red'
+				}, 5);
+			}
+			return false;
+		}
+	}
+
+	/**
+	 * Stop screen sharing and restore the camera video track.
+	 * If the original call was audio-only, just removes the video track.
+	 */
+	async stopScreenShare() {
+		try {
+			if (!this._isScreenSharing) {
+				return;
+			}
+
+			console.log('🖥️ Stopping screen share...');
+
+			// Stop screen capture tracks
+			if (this._screenStream) {
+				this._screenStream.getTracks().forEach(t => t.stop());
+				this._screenStream = null;
+			}
+
+			// Find the video sender (check track kind, or fallback to transceiver mid)
+			const videoSender = this.peerConnection?.getSenders().find(s => {
+				if (s.track && s.track.kind === 'video') return true;
+				// Fallback: check transceiver
+				const transceivers = this.peerConnection.getTransceivers();
+				const tr = transceivers.find(t => t.sender === s);
+				return tr && tr.mid && tr.receiver?.track?.kind === 'video';
+			});
+
+			if (videoSender && this._savedCameraTrack && this._savedCameraTrack.readyState === 'live') {
+				// Restore the camera track
+				await videoSender.replaceTrack(this._savedCameraTrack);
+				console.log('✅ Restored camera track');
+
+				// Update localStream
+				if (this.localStream) {
+					this.localStream.getVideoTracks().forEach(t => this.localStream.removeTrack(t));
+					this.localStream.addTrack(this._savedCameraTrack);
+				}
+			} else if (videoSender) {
+				// No camera track to restore (was audio-only call) — send null to stop video
+				await videoSender.replaceTrack(null);
+				console.log('✅ Removed screen track (no camera to restore)');
+
+				// Remove video tracks from localStream
+				if (this.localStream) {
+					this.localStream.getVideoTracks().forEach(t => {
+						t.stop();
+						this.localStream.removeTrack(t);
+					});
+				}
+			}
+
+			this._savedCameraTrack = null;
+			this._isScreenSharing = false;
+
+			// Update local video preview
+			this.attachLocalStream();
+
+			// Send renegotiation so remote side updates its video display
+			if (this.peerConnection && this.remoteUser && this.callId) {
+				try {
+					const offer = await this.peerConnection.createOffer();
+					await this.peerConnection.setLocalDescription(offer);
+					await frappe.call({
+						method: 'f_icecore.f_icecore.api.signaling.send_offer',
+						args: {
+							to_user: this.remoteUser,
+							offer_sdp: JSON.stringify(offer),
+							call_id: this.callId
+						}
+					});
+					console.log('📤 Sent renegotiation offer after stopping screen share');
+				} catch (renego) {
+					console.warn('⚠️ Renegotiation after stopping screen share failed:', renego);
+				}
+			}
+
+			console.log('✅ Screen sharing stopped');
+
+		} catch (error) {
+			console.error('❌ Failed to stop screen share:', error);
+		}
+	}
+
+	/**
+	 * Toggle screen sharing on/off.
+	 * Returns true if screen sharing is now active, false if stopped.
+	 */
+	async toggleScreenShare() {
+		if (this._isScreenSharing) {
+			await this.stopScreenShare();
+			return false;
+		} else {
+			const started = await this.startScreenShare();
+			return started;
+		}
+	}
+
+	// ============================================================
 	// End Call
 	// ============================================================
 
 	async endCall() {
+		// Stop screen sharing if active
+		if (this._isScreenSharing) {
+			if (this._screenStream) {
+				this._screenStream.getTracks().forEach(t => t.stop());
+				this._screenStream = null;
+			}
+			if (this._savedCameraTrack) {
+				this._savedCameraTrack.stop();
+				this._savedCameraTrack = null;
+			}
+			this._isScreenSharing = false;
+		}
+
 		// Stop local stream
 		if (this.localStream) {
 			this.localStream.getTracks().forEach(track => track.stop());

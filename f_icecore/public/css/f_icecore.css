@@ -372,6 +372,180 @@
 	}
 }
 
+/* ===== Search & Call Panel ===== */
+.f-ic-search-container {
+	padding: 12px 15px 8px;
+	border-bottom: 1px solid #eee;
+}
+
+.f-ic-search-container input {
+	padding-right: 35px;
+}
+
+/* Selected users bar */
+.f-ic-selected-bar {
+	padding: 10px 15px;
+	background: #f0f7ff;
+	border-bottom: 1px solid #d4e6f9;
+}
+
+.f-ic-chips-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 8px;
+}
+
+.f-ic-selected-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	background: #e3f2fd;
+	color: #1565c0;
+	padding: 3px 8px 3px 10px;
+	border-radius: 16px;
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.f-ic-selected-chip .f-ic-remove-selected {
+	cursor: pointer;
+	font-weight: bold;
+	font-size: 14px;
+	color: #1565c0;
+	margin-left: 2px;
+	line-height: 1;
+}
+
+.f-ic-selected-chip .f-ic-remove-selected:hover {
+	color: #c62828;
+}
+
+/* Group call buttons */
+.f-ic-group-call-btns {
+	display: flex;
+	gap: 10px;
+	justify-content: center;
+	margin-top: 4px;
+}
+
+/* Pagination */
+.f-ic-pagination {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: 15px;
+	padding: 10px 15px;
+	border-top: 1px solid #eee;
+}
+
+.f-ic-pagination button:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+/* User card selected state */
+.f-icecore-user-card.selected {
+	background-color: #e8f5e9;
+	border-left: 3px solid #43b581;
+}
+
+/* User card always-visible call actions (mobile-friendly) */
+.f-icecore-user-card .call-actions {
+	opacity: 1;
+}
+
+/* ===== Group Call Video Grid ===== */
+.f-ic-group-video-grid {
+	display: grid;
+	gap: 4px;
+	background: #000;
+	border-radius: 8px;
+	overflow: hidden;
+	min-height: 400px;
+}
+
+.f-ic-group-video-grid.participants-1 {
+	grid-template-columns: 1fr;
+}
+
+.f-ic-group-video-grid.participants-2 {
+	grid-template-columns: 1fr 1fr;
+}
+
+.f-ic-group-video-grid.participants-3 {
+	grid-template-columns: 1fr 1fr;
+}
+
+.f-ic-group-video-grid.participants-4 {
+	grid-template-columns: 1fr 1fr;
+	grid-template-rows: 1fr 1fr;
+}
+
+.f-ic-group-video-grid.participants-5 {
+	grid-template-columns: 1fr 1fr 1fr;
+}
+
+.f-ic-participant-tile {
+	position: relative;
+	background: #1a1a2e;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 180px;
+	overflow: hidden;
+}
+
+.f-ic-participant-tile video {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.f-ic-participant-tile .participant-label {
+	position: absolute;
+	bottom: 8px;
+	left: 8px;
+	color: white;
+	background: rgba(0, 0, 0, 0.6);
+	padding: 2px 8px;
+	border-radius: 4px;
+	font-size: 12px;
+	z-index: 5;
+}
+
+.f-ic-participant-tile .participant-avatar-placeholder {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	color: #aaa;
+}
+
+.f-ic-participant-tile .participant-status-dot {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	border: 2px solid rgba(255,255,255,0.5);
+	z-index: 5;
+}
+
+.f-ic-participant-tile .participant-status-dot.connecting {
+	background-color: #faa61a;
+	animation: pulse 1.5s infinite;
+}
+
+.f-ic-participant-tile .participant-status-dot.connected {
+	background-color: #43b581;
+}
+
+.f-ic-participant-tile .participant-status-dot.failed {
+	background-color: #f04747;
+}
+
 /* Toast Notification for Incoming Calls */
 .f-icecore-toast-call {
 	position: fixed;

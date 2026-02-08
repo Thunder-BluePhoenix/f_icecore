@@ -1,0 +1,61 @@
+{
+ "actions": [],
+ "creation": "2025-02-09 00:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "status",
+  "joined_at",
+  "left_at",
+  "is_initiator"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "default": "Invited",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Invited\nRinging\nConnected\nDisconnected\nRejected"
+  },
+  {
+   "fieldname": "joined_at",
+   "fieldtype": "Datetime",
+   "label": "Joined At"
+  },
+  {
+   "fieldname": "left_at",
+   "fieldtype": "Datetime",
+   "label": "Left At"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_initiator",
+   "fieldtype": "Check",
+   "label": "Is Initiator"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-02-09 00:00:00",
+ "modified_by": "Administrator",
+ "module": "F Icecore",
+ "name": "F IceCore Group Call Participant",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}
