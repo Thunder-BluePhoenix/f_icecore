@@ -2,6 +2,7 @@
 WebRTC Signaling API
 Handles offer, answer, and ICE candidate exchange between peers
 Uses Frappe's realtime (SocketIO) for signaling
++ HTTP Polling fallback for clients with broken SocketIO (e.g. mobile via IP address)
 """
 
 import frappe
@@ -9,7 +10,101 @@ from frappe import _
 from frappe.realtime import publish_realtime
 import json
 from datetime import datetime
+import time
 
+
+# ============================================================
+# Signal Queue - Redis-based queue for polling fallback
+# ============================================================
+
+def _queue_signal(user, event, message):
+	"""
+	Queue a signal in Redis for a specific user.
+	This is called alongside publish_realtime so that clients
+	without a working SocketIO connection can still receive signals
+	by polling via HTTP.
+
+	Signals are stored as a Redis list with a TTL of 120 seconds.
+	Each signal is a JSON object with event name, message data, and timestamp.
+	"""
+	try:
+		cache_key = f"f_icecore:signal_queue:{user}"
+		signal = json.dumps({
+			"event": event,
+			"message": message,
+			"ts": time.time()
+		})
+		# Use Redis list - push to the right
+		r = frappe.cache()
+		r.rpush(cache_key, signal)
+		# Set expiry to 120 seconds (signals older than that are stale anyway)
+		r.expire(cache_key, 120)
+	except Exception as e:
+		frappe.logger().error(f"F-IceCore: Failed to queue signal for {user}: {e}")
+
+
+@frappe.whitelist()
+def poll_signals():
+	"""
+	Poll for pending signals for the current user.
+	Returns all queued signals and clears the queue.
+
+	This is the HTTP polling fallback for clients whose SocketIO
+	connection is broken (e.g. mobile connecting via IP address).
+
+	Returns:
+		list: Array of signal objects [{event, message, ts}, ...]
+	"""
+	user = frappe.session.user
+	cache_key = f"f_icecore:signal_queue:{user}"
+
+	try:
+		r = frappe.cache()
+		signals = []
+
+		# Pop all items from the list atomically
+		while True:
+			item = r.lpop(cache_key)
+			if item is None:
+				break
+			try:
+				if isinstance(item, bytes):
+					item = item.decode('utf-8')
+				signal = json.loads(item)
+				signals.append(signal)
+			except (json.JSONDecodeError, UnicodeDecodeError) as e:
+				frappe.logger().error(f"F-IceCore: Failed to parse queued signal: {e}")
+
+		return signals
+	except Exception as e:
+		frappe.logger().error(f"F-IceCore: Failed to poll signals: {e}")
+		return []
+
+
+# ============================================================
+# Helper: publish + queue (dual-write)
+# ============================================================
+
+def _publish_and_queue(event, message, user, after_commit=False):
+	"""
+	Send a signal via both SocketIO (publish_realtime) AND Redis queue.
+	The SocketIO path works when the client has a working connection.
+	The Redis queue path works when polled via HTTP.
+	"""
+	# SocketIO path (may not reach client if their socket is disconnected)
+	publish_realtime(
+		event=event,
+		message=message,
+		user=user,
+		after_commit=after_commit
+	)
+	# Redis queue path (always works - client polls via HTTP)
+	_queue_signal(user, event, message)
+
+
+# ============================================================
+# Call lifecycle APIs
+# ============================================================
 
 @frappe.whitelist()
 def initiate_call(to_user, call_type="audio", metadata=None):
@@ -52,7 +147,7 @@ def initiate_call(to_user, call_type="audio", metadata=None):
 		"call_id": call_session["name"],
 		"from_user": from_user,
 		"from_user_name": frappe.db.get_value("User", from_user, "full_name"),
-		"to_user": to_user,  # Client-side will filter based on this
+		"to_user": to_user,
 		"call_type": call_type,
 		"metadata": metadata,
 		"timestamp": str(call_session["creation"])
@@ -60,15 +155,15 @@ def initiate_call(to_user, call_type="audio", metadata=None):
 
 	print(f"🔔 F-IceCore: call_data = {call_data}\n")
 
-	# Send to the target user specifically
-	print(f"🔔 F-IceCore: Sending incoming_call to user={to_user} (with after_commit=True)\n")
-	publish_realtime(
+	# Send via both SocketIO AND Redis queue
+	print(f"🔔 F-IceCore: Sending incoming_call to user={to_user} (SocketIO + Redis queue)\n")
+	_publish_and_queue(
 		event="f_icecore:incoming_call",
 		message=call_data,
 		user=to_user,
 		after_commit=True
 	)
-	print(f"✅✅✅ F-IceCore: publish_realtime completed!\n\n")
+	print(f"✅✅✅ F-IceCore: publish_and_queue completed!\n\n")
 
 	frappe.logger().info(f"✅ F-IceCore: Broadcasted incoming_call event")
 
@@ -91,8 +186,8 @@ def accept_call(call_id):
 	call_doc.accepted_at = datetime.now()
 	call_doc.save(ignore_permissions=True)
 
-	# Notify the caller that call was accepted
-	publish_realtime(
+	# Notify the caller that call was accepted (via both SocketIO + queue)
+	_publish_and_queue(
 		event="call_accepted",
 		message={"call_id": call_id, "accepted_by": user, "from_user": call_doc.from_user, "to_user": call_doc.to_user, "timestamp": datetime.now().isoformat()},
 		user=call_doc.from_user,
@@ -120,8 +215,8 @@ def reject_call(call_id, reason=None):
 
 	other_user = call_doc.from_user if user == call_doc.to_user else call_doc.to_user
 
-	# Notify the other party that call was rejected
-	publish_realtime(
+	# Notify the other party (via both SocketIO + queue)
+	_publish_and_queue(
 		event="call_rejected",
 		message={"call_id": call_id, "rejected_by": user, "reason": reason, "from_user": call_doc.from_user, "to_user": call_doc.to_user, "timestamp": datetime.now().isoformat()},
 		user=other_user,
@@ -148,8 +243,8 @@ def end_call(call_id):
 
 	other_user = call_doc.to_user if user == call_doc.from_user else call_doc.from_user
 
-	# Notify the other party that call ended
-	publish_realtime(
+	# Notify the other party (via both SocketIO + queue)
+	_publish_and_queue(
 		event="call_ended",
 		message={"call_id": call_id, "ended_by": user, "from_user": call_doc.from_user, "to_user": call_doc.to_user, "timestamp": datetime.now().isoformat()},
 		user=other_user,
@@ -161,6 +256,10 @@ def end_call(call_id):
 	return {"success": True}
 
 
+# ============================================================
+# WebRTC signaling APIs (offer, answer, ICE candidates)
+# ============================================================
+
 @frappe.whitelist()
 def send_offer(to_user, offer_sdp, call_id=None, call_type=None):
 	"""Send WebRTC offer to peer"""
@@ -168,11 +267,18 @@ def send_offer(to_user, offer_sdp, call_id=None, call_type=None):
 	# Get call_type from call session if not provided
 	if not call_type and call_id:
 		call_type = frappe.db.get_value("F IceCore Call Session", call_id, "call_type") or "audio"
+
+	message = {"from_user": from_user, "offer": offer_sdp, "call_id": call_id, "call_type": call_type or "audio", "timestamp": datetime.now().isoformat()}
+
+	# SocketIO path (user-specific event)
 	publish_realtime(
 		event=f"f_icecore:webrtc_offer:{to_user}",
-		message={"from_user": from_user, "offer": offer_sdp, "call_id": call_id, "call_type": call_type or "audio", "timestamp": datetime.now().isoformat()},
+		message=message,
 		user=to_user
 	)
+	# Redis queue path (generic event name - client will parse)
+	_queue_signal(to_user, "f_icecore:webrtc_offer", message)
+
 	return {"success": True}
 
 
@@ -180,11 +286,17 @@ def send_offer(to_user, offer_sdp, call_id=None, call_type=None):
 def send_answer(to_user, answer_sdp, call_id=None):
 	"""Send WebRTC answer to peer"""
 	from_user = frappe.session.user
+	message = {"from_user": from_user, "answer": answer_sdp, "call_id": call_id, "timestamp": datetime.now().isoformat()}
+
+	# SocketIO path
 	publish_realtime(
 		event=f"f_icecore:webrtc_answer:{to_user}",
-		message={"from_user": from_user, "answer": answer_sdp, "call_id": call_id, "timestamp": datetime.now().isoformat()},
+		message=message,
 		user=to_user
 	)
+	# Redis queue path
+	_queue_signal(to_user, "f_icecore:webrtc_answer", message)
+
 	return {"success": True}
 
 
@@ -192,13 +304,23 @@ def send_answer(to_user, answer_sdp, call_id=None):
 def send_ice_candidate(to_user, candidate, call_id=None):
 	"""Send ICE candidate to peer"""
 	from_user = frappe.session.user
+	message = {"from_user": from_user, "candidate": candidate, "call_id": call_id, "timestamp": datetime.now().isoformat()}
+
+	# SocketIO path
 	publish_realtime(
 		event=f"f_icecore:ice_candidate:{to_user}",
-		message={"from_user": from_user, "candidate": candidate, "call_id": call_id, "timestamp": datetime.now().isoformat()},
+		message=message,
 		user=to_user
 	)
+	# Redis queue path
+	_queue_signal(to_user, "f_icecore:ice_candidate", message)
+
 	return {"success": True}
 
+
+# ============================================================
+# Debug / Test endpoints
+# ============================================================
 
 @frappe.whitelist()
 def test_realtime(to_user):
@@ -211,7 +333,7 @@ def test_realtime(to_user):
 	from_user = frappe.session.user
 
 	# Test 1: Send to specific user (user= param)
-	publish_realtime(
+	_publish_and_queue(
 		event="f_icecore:test_ping",
 		message={"from_user": from_user, "test": "user_targeted", "timestamp": datetime.now().isoformat()},
 		user=to_user,
@@ -219,7 +341,7 @@ def test_realtime(to_user):
 	)
 
 	# Test 2: Also send incoming_call event to specific user
-	publish_realtime(
+	_publish_and_queue(
 		event="f_icecore:incoming_call",
 		message={
 			"call_id": "TEST-CALL",
@@ -238,9 +360,13 @@ def test_realtime(to_user):
 
 	return {
 		"success": True,
-		"message": f"Test events sent to {to_user}. Check their browser console."
+		"message": f"Test events sent to {to_user}. Check their browser console or poll_signals."
 	}
 
+
+# ============================================================
+# Helper functions
+# ============================================================
 
 def handle_signal(data):
 	"""Generic signal handler for SocketIO events"""
