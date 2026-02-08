@@ -5,6 +5,30 @@
 
 console.log('🔵 F-IceCore Boot: Script executed');
 
+// --- HTTPS-aware SocketIO port override ---
+// When using HTTPS proxy (port 8443), SocketIO must connect to WSS proxy (port 9443)
+// instead of the plain HTTP SocketIO port (9002)
+(function() {
+	if (window.location.protocol === 'https:' && window.location.port === '8443') {
+		// We're on the HTTPS proxy - override SocketIO port to WSS proxy
+		if (typeof frappe !== 'undefined' && frappe.boot) {
+			frappe.boot.socketio_port = '9443';
+			console.log('🔒 F-IceCore Boot: HTTPS detected, SocketIO port overridden to 9443 (WSS)');
+		} else {
+			// frappe.boot not ready yet, set it when it becomes available
+			const _checkBoot = setInterval(() => {
+				if (typeof frappe !== 'undefined' && frappe.boot) {
+					frappe.boot.socketio_port = '9443';
+					console.log('🔒 F-IceCore Boot: HTTPS detected (delayed), SocketIO port overridden to 9443 (WSS)');
+					clearInterval(_checkBoot);
+				}
+			}, 50);
+			// Give up after 10 seconds
+			setTimeout(() => clearInterval(_checkBoot), 10000);
+		}
+	}
+})();
+
 // Wait for frappe to be available
 if (typeof frappe === 'undefined') {
 	console.warn('⚠️ F-IceCore Boot: Frappe not loaded yet, will initialize on ready');
