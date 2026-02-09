@@ -160,7 +160,8 @@ scheduler_events = {
 		"f_icecore.f_icecore.api.presence.cleanup_stale_presence"
 	],
 	"hourly": [
-		"f_icecore.f_icecore.api.call_session.cleanup_old_sessions"
+		"f_icecore.f_icecore.api.call_session.cleanup_old_sessions",
+		"f_icecore.f_icecore.api.call_recording.cleanup_old_recordings"
 	],
 }
 

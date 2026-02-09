@@ -622,8 +622,8 @@ f_icecore/
 - [x] 1:1 to group call upgrade
 - [x] Group call screen sharing
 - [x] Call window recovery
-- [ ] Call recording
-- [ ] Call transfer
+- [x] Call recording
+- [x] Call transfer
 - [ ] End-to-end encryption
 - [ ] Mobile app support
 - [ ] Virtual backgrounds

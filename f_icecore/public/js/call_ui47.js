@@ -729,6 +729,12 @@ class FIceCoreCallUI {
 						<button class="btn btn-info btn-lg" id="toggle-screen-share-btn" title="${__('Share your screen during this call')}">
 							<i class="fa fa-desktop"></i> ${__('Share Screen')}
 						</button>
+						<button class="btn btn-secondary btn-lg" id="toggle-record-btn" title="${__('Record this call')}">
+							<i class="fa fa-circle" style="color: #dc3545;"></i> ${__('Record')}
+						</button>
+						<button class="btn btn-secondary btn-lg" id="transfer-call-btn" title="${__('Transfer this call to another user')}">
+							<i class="fa fa-exchange"></i> ${__('Transfer')}
+						</button>
 						<button class="btn btn-primary btn-lg" id="add-participant-btn" title="${__('Add another person to this call')}">
 							<i class="fa fa-user-plus"></i> ${__('Add')}
 						</button>
@@ -752,6 +758,12 @@ class FIceCoreCallUI {
 			}
 			$content.find('#toggle-screen-share-btn').on('click', () => {
 				window.FIceCoreUI.toggleScreenShare();
+			});
+			$content.find('#toggle-record-btn').on('click', () => {
+				window.FIceCoreUI.toggleRecording();
+			});
+			$content.find('#transfer-call-btn').on('click', () => {
+				window.FIceCoreUI.showTransferDialog(callId, remoteUser, callType);
 			});
 			$content.find('#f-icecore-hangup-btn').on('click', () => {
 				window.FIceCoreUI.hangup();
@@ -2413,6 +2425,539 @@ class FIceCoreCallUI {
 		} catch (error) {
 			console.error('Failed to update presence:', error);
 		}
+	}
+
+	// ============================================================
+	// Call Recording UI
+	// ============================================================
+
+	/**
+	 * Toggle call recording on/off.
+	 */
+	async toggleRecording() {
+		if (!window.FIceCore) {
+			console.warn('WebRTC engine not available');
+			return;
+		}
+
+		const btn = document.getElementById('toggle-record-btn');
+		if (btn) btn.disabled = true;
+
+		try {
+			if (window.FIceCore.isRecording()) {
+				await window.FIceCore.stopRecording();
+				this._updateRecordButton(false);
+				frappe.show_alert({
+					message: __('Recording stopped. File is being saved...'),
+					indicator: 'blue'
+				}, 5);
+			} else {
+				const started = await window.FIceCore.startRecording();
+				if (started) {
+					this._updateRecordButton(true);
+					frappe.show_alert({
+						message: __('Recording started'),
+						indicator: 'red'
+					}, 3);
+				} else {
+					frappe.show_alert({
+						message: __('Failed to start recording'),
+						indicator: 'red'
+					}, 5);
+				}
+			}
+		} catch (error) {
+			console.error('Recording toggle failed:', error);
+		} finally {
+			if (btn) btn.disabled = false;
+		}
+	}
+
+	/**
+	 * Update the record button appearance.
+	 */
+	_updateRecordButton(isRecording) {
+		const btn = document.getElementById('toggle-record-btn');
+		if (!btn) return;
+
+		if (isRecording) {
+			btn.className = 'btn btn-danger btn-lg';
+			btn.innerHTML = '<i class="fa fa-stop-circle"></i> ' + __('Stop Rec');
+			btn.title = __('Stop recording');
+		} else {
+			btn.className = 'btn btn-secondary btn-lg';
+			btn.innerHTML = '<i class="fa fa-circle" style="color: #dc3545;"></i> ' + __('Record');
+			btn.title = __('Record this call');
+		}
+	}
+
+	// ============================================================
+	// Call Transfer UI
+	// ============================================================
+
+	/**
+	 * Show the transfer dialog where user can search for a transfer target.
+	 */
+	showTransferDialog(callId, remoteUser, callType) {
+		console.log('Transfer: Opening transfer dialog', { callId, remoteUser, callType });
+
+		const _transferState = { query: '', debounceTimer: null };
+
+		const transferDialog = new frappe.ui.Dialog({
+			title: `<i class="fa fa-exchange"></i> ${__('Transfer Call')}`,
+			size: 'small',
+			fields: [
+				{
+					fieldtype: 'HTML',
+					fieldname: 'transfer_content'
+				}
+			]
+		});
+
+		transferDialog.show();
+
+		setTimeout(() => {
+			const $content = transferDialog.fields_dict.transfer_content.$wrapper;
+			$content.html(`
+				<div style="padding: 10px;">
+					<div style="margin-bottom: 15px;">
+						<p style="font-size: 12px; color: #888; margin-bottom: 10px;">
+							${__('Search for a user to transfer this call to. The other party will be connected to the selected user.')}
+						</p>
+					</div>
+					<div class="f-ic-search-container" style="margin-bottom: 15px;">
+						<input type="text" id="transfer-search" class="form-control"
+							placeholder="${__('Search by name, email, or phone...')}"
+							autocomplete="off" />
+					</div>
+					<div id="transfer-results" style="max-height: 300px; overflow-y: auto;">
+						<p style="text-align: center; color: #888; padding: 20px;">${__('Type to search for users...')}</p>
+					</div>
+				</div>
+			`);
+
+			// Search with debounce
+			$content.find('#transfer-search').on('input', (e) => {
+				const query = e.target.value.trim();
+				_transferState.query = query;
+				clearTimeout(_transferState.debounceTimer);
+				_transferState.debounceTimer = setTimeout(() => {
+					this._searchUsersForTransfer(query, $content, transferDialog, callId, remoteUser, callType);
+				}, 300);
+			});
+
+			$content.find('#transfer-search').focus();
+		}, 100);
+	}
+
+	/**
+	 * Search users for transfer target.
+	 */
+	async _searchUsersForTransfer(query, $content, transferDialog, callId, remoteUser, callType) {
+		if (!query || query.length < 1) {
+			$content.find('#transfer-results').html(
+				`<p style="text-align: center; color: #888; padding: 20px;">${__('Type to search for users...')}</p>`
+			);
+			return;
+		}
+
+		try {
+			const response = await frappe.call({
+				method: 'f_icecore.f_icecore.api.presence.search_users',
+				args: { query: query, page: 1, page_size: 8 }
+			});
+
+			const data = response.message;
+			const users = data.users || [];
+
+			if (users.length === 0) {
+				$content.find('#transfer-results').html(
+					`<p style="text-align: center; color: #888; padding: 20px;">${__('No users found')}</p>`
+				);
+				return;
+			}
+
+			// Filter out current user and the other party in the call
+			const currentUser = frappe.session.user;
+			const excludeUsers = [currentUser, remoteUser];
+			const filteredUsers = users.filter(u => !excludeUsers.includes(u.user));
+
+			if (filteredUsers.length === 0) {
+				$content.find('#transfer-results').html(
+					`<p style="text-align: center; color: #888; padding: 20px;">${__('No available users to transfer to')}</p>`
+				);
+				return;
+			}
+
+			let html = '';
+			for (const user of filteredUsers) {
+				const statusColor = user.status === 'online' ? '#28a745' : (user.status === 'in_call' ? '#ffc107' : '#ccc');
+				const statusText = user.status === 'online' ? 'Online' : (user.status === 'in_call' ? 'In Call' : 'Offline');
+				html += `
+					<div class="f-icecore-user-card transfer-user" data-user="${user.user}" style="cursor: pointer; padding: 10px 12px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 10px; transition: background 0.2s;">
+						<div style="flex-shrink: 0;">
+							${frappe.avatar(user.user, 'avatar-medium')}
+						</div>
+						<div style="flex: 1; min-width: 0;">
+							<div style="font-weight: 600; font-size: 13px;">${user.full_name}</div>
+							<div style="font-size: 11px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${user.user}</div>
+						</div>
+						<div style="flex-shrink: 0; display: flex; align-items: center; gap: 6px;">
+							<span style="width: 8px; height: 8px; border-radius: 50%; background: ${statusColor}; display: inline-block;"></span>
+							<span style="font-size: 11px; color: #888;">${statusText}</span>
+						</div>
+					</div>
+				`;
+			}
+
+			$content.find('#transfer-results').html(html);
+
+			// Click handler: initiate blind transfer
+			$content.find('.transfer-user').on('click', async (e) => {
+				const selectedUser = $(e.currentTarget).data('user');
+				console.log('Transfer: Selected target:', selectedUser);
+
+				$(e.currentTarget).css({ opacity: 0.5, pointerEvents: 'none' });
+				$(e.currentTarget).append(' <i class="fa fa-spinner fa-spin"></i>');
+
+				try {
+					await this._initiateTransfer(callId, selectedUser, 'blind', callType);
+					transferDialog.hide();
+				} catch (err) {
+					console.error('Transfer failed:', err);
+					$(e.currentTarget).css({ opacity: 1, pointerEvents: 'auto' });
+					$(e.currentTarget).find('.fa-spinner').remove();
+					frappe.show_alert({ message: __('Failed to transfer call'), indicator: 'red' }, 5);
+				}
+			});
+
+			// Hover effect
+			$content.find('.transfer-user').hover(
+				function() { $(this).css('background', '#f8f9fa'); },
+				function() { $(this).css('background', ''); }
+			);
+
+		} catch (error) {
+			console.error('Transfer search failed:', error);
+		}
+	}
+
+	/**
+	 * Initiate a call transfer via backend API.
+	 */
+	async _initiateTransfer(callId, transferTarget, transferType, callType) {
+		console.log('Transfer: Initiating', { callId, transferTarget, transferType });
+
+		const response = await frappe.call({
+			method: 'f_icecore.f_icecore.api.call_transfer.initiate_transfer',
+			args: {
+				call_id: callId,
+				transfer_target: transferTarget,
+				transfer_type: transferType
+			}
+		});
+
+		const result = response.message;
+		if (!result.success) {
+			frappe.show_alert({ message: result.message, indicator: 'red' }, 5);
+			return;
+		}
+
+		this._activeTransferId = result.transfer_id;
+
+		if (transferType === 'blind') {
+			// For blind transfer: end our side of the call
+			frappe.show_alert({
+				message: __('Call is being transferred...'),
+				indicator: 'blue'
+			}, 5);
+
+			// End our connection (the other party will be reconnected to the target)
+			this.stopDurationTimer();
+			if (this.currentCallWindow) {
+				this.currentCallWindow.hide();
+				this.currentCallWindow = null;
+			}
+			if (window.FIceCore) {
+				// Stop recording if active
+				if (window.FIceCore.isRecording()) {
+					await window.FIceCore.stopRecording();
+				}
+				await window.FIceCore.endCall();
+			}
+			await this.updatePresence('online');
+		}
+	}
+
+	/**
+	 * Handle incoming transfer notification (you are the transfer target).
+	 * Shows a dialog similar to incoming call, but with transfer context.
+	 */
+	handleTransferIncoming(data) {
+		console.log('Transfer: Incoming transfer:', data);
+
+		const { transfer_id, from_user, from_user_name, transferred_by_name, call_type } = data;
+		const callTypeIcon = call_type === 'video' ? 'video-camera' : 'phone';
+		const callTypeText = call_type === 'video' ? 'Video' : 'Audio';
+
+		// Play ringtone
+		this.playRingtone();
+
+		// Desktop notification
+		this.showDesktopNotification(from_user_name, `${callTypeText} Transfer`, false);
+
+		// Close existing incoming dialog
+		if (this.incomingCallDialog) {
+			this.incomingCallDialog.hide();
+		}
+
+		this.incomingCallDialog = new frappe.ui.Dialog({
+			title: `<i class="fa fa-exchange"></i> ${__('Incoming Call Transfer')}`,
+			static: true,
+			minimizable: false,
+			fields: [
+				{
+					fieldtype: 'HTML',
+					fieldname: 'transfer_incoming_content'
+				}
+			]
+		});
+
+		this.incomingCallDialog.show();
+
+		setTimeout(() => {
+			const $content = this.incomingCallDialog.fields_dict.transfer_incoming_content.$wrapper;
+			$content.html(`
+				<div style="text-align: center; padding: 30px;">
+					<div style="margin-bottom: 20px; display: flex; justify-content: center;">
+						${frappe.avatar(from_user, 'avatar-large')}
+					</div>
+					<h3 style="margin-bottom: 10px;">${from_user_name}</h3>
+					<p style="color: #888; margin-bottom: 10px; font-size: 14px;">
+						<i class="fa fa-exchange"></i> ${__('Call transferred by')} ${transferred_by_name}
+					</p>
+					<p style="color: #888; margin-bottom: 25px; font-size: 16px;">
+						<i class="fa fa-${callTypeIcon}"></i> ${callTypeText} ${__('Call')}
+					</p>
+					<div style="display: flex; justify-content: center; gap: 20px;">
+						<button class="btn btn-success btn-lg" id="f-icecore-transfer-accept-btn">
+							<i class="fa fa-phone"></i> ${__('Accept')}
+						</button>
+						<button class="btn btn-danger btn-lg" id="f-icecore-transfer-decline-btn">
+							<i class="fa fa-phone-slash"></i> ${__('Decline')}
+						</button>
+					</div>
+				</div>
+			`);
+
+			$content.find('#f-icecore-transfer-accept-btn').on('click', () => {
+				this._acceptTransfer(transfer_id, data);
+			});
+			$content.find('#f-icecore-transfer-decline-btn').on('click', () => {
+				this._rejectTransfer(transfer_id);
+			});
+		}, 50);
+
+		window.focus();
+	}
+
+	/**
+	 * Accept an incoming transfer.
+	 */
+	async _acceptTransfer(transferId, data) {
+		try {
+			console.log('Transfer: Accepting transfer:', transferId);
+
+			if (this.incomingCallDialog) {
+				this.incomingCallDialog.hide();
+				this.incomingCallDialog = null;
+			}
+			this.stopRingtone();
+
+			// Accept transfer in backend — creates new call session
+			const response = await frappe.call({
+				method: 'f_icecore.f_icecore.api.call_transfer.accept_transfer',
+				args: { transfer_id: transferId }
+			});
+
+			const result = response.message;
+			if (!result.success) {
+				frappe.show_alert({ message: __('Failed to accept transfer'), indicator: 'red' }, 5);
+				return;
+			}
+
+			const { new_call_id, remaining_user, remaining_user_name, call_type } = result;
+
+			// Request media permission
+			if (window.FIceCore) {
+				await window.FIceCore.requestMediaPermission(call_type);
+			}
+
+			// Show call window with the remaining user
+			this.showCallWindow(remaining_user, call_type, new_call_id, false);
+
+			// Start WebRTC connection — we answer the call (remaining user will send offer)
+			if (window.FIceCore) {
+				await window.FIceCore.answerCall(remaining_user, call_type, new_call_id);
+			}
+
+			await this.updatePresence('in_call', { call_id: new_call_id });
+
+			frappe.show_alert({
+				message: `${__('Connected with')} ${remaining_user_name}`,
+				indicator: 'green'
+			}, 3);
+
+		} catch (error) {
+			console.error('Transfer: Failed to accept:', error);
+			frappe.msgprint(__('Failed to accept transferred call'));
+		}
+	}
+
+	/**
+	 * Reject an incoming transfer.
+	 */
+	async _rejectTransfer(transferId) {
+		try {
+			if (this.incomingCallDialog) {
+				this.incomingCallDialog.hide();
+				this.incomingCallDialog = null;
+			}
+			this.stopRingtone();
+
+			await frappe.call({
+				method: 'f_icecore.f_icecore.api.call_transfer.reject_transfer',
+				args: { transfer_id: transferId }
+			});
+
+		} catch (error) {
+			console.error('Transfer: Failed to reject:', error);
+		}
+	}
+
+	/**
+	 * Handle transfer notification (you are the remaining party being transferred).
+	 * Shows an alert that the call is being transferred.
+	 */
+	handleTransferNotify(data) {
+		console.log('Transfer: Notify — call is being transferred:', data);
+
+		const { transfer_target_name, transfer_type, message: msg } = data;
+
+		if (msg) {
+			frappe.show_alert({
+				message: msg,
+				indicator: 'blue'
+			}, 8);
+		} else {
+			frappe.show_alert({
+				message: `${__('Call is being transferred to')} ${transfer_target_name}...`,
+				indicator: 'blue'
+			}, 8);
+		}
+	}
+
+	/**
+	 * Handle transfer completed — reconnect to the new peer.
+	 * The remaining party (B) needs to establish a new WebRTC connection with the target (C).
+	 */
+	async handleTransferCompleted(data) {
+		console.log('Transfer: Completed:', data);
+
+		const { new_call_id, new_peer, new_peer_name, call_type, old_call_id } = data;
+
+		if (!new_peer || !new_call_id) {
+			// This is just a status notification to the original transferrer
+			if (data.status === 'completed') {
+				frappe.show_alert({
+					message: __('Transfer completed successfully'),
+					indicator: 'green'
+				}, 5);
+			}
+			return;
+		}
+
+		// We are the remaining party — need to reconnect to the new peer
+		console.log('Transfer: Reconnecting to new peer:', new_peer);
+
+		// End the old connection cleanly (without notifying backend — it's already ended)
+		if (window.FIceCore) {
+			if (window.FIceCore.peerConnection) {
+				window.FIceCore.peerConnection.close();
+				window.FIceCore.peerConnection = null;
+			}
+			if (window.FIceCore.localStream) {
+				window.FIceCore.localStream.getTracks().forEach(t => t.stop());
+				window.FIceCore.localStream = null;
+			}
+			window.FIceCore.remoteStream = null;
+			window.FIceCore.callId = null;
+			window.FIceCore.remoteUser = null;
+		}
+
+		// Remove hidden audio element
+		const remoteAudio = document.getElementById('remote-audio');
+		if (remoteAudio) {
+			remoteAudio.srcObject = null;
+			remoteAudio.remove();
+		}
+
+		this.stopDurationTimer();
+
+		// Close old call window
+		if (this.currentCallWindow) {
+			this.currentCallWindow.hide();
+			this.currentCallWindow = null;
+		}
+
+		frappe.show_alert({
+			message: `${__('Transferred. Connecting to')} ${new_peer_name}...`,
+			indicator: 'green'
+		}, 5);
+
+		// Show new call window and start a new WebRTC call to the transfer target
+		this.showCallWindow(new_peer, call_type || 'audio', new_call_id, true);
+
+		if (window.FIceCore) {
+			await window.FIceCore.startCall(new_peer, call_type || 'audio', new_call_id);
+		}
+
+		await this.updatePresence('in_call', { call_id: new_call_id });
+	}
+
+	/**
+	 * Handle transfer failed notification.
+	 */
+	handleTransferFailed(data) {
+		console.log('Transfer: Failed:', data);
+
+		frappe.show_alert({
+			message: data.reason || __('Transfer failed'),
+			indicator: 'red'
+		}, 5);
+
+		this._activeTransferId = null;
+	}
+
+	/**
+	 * Handle transfer cancelled notification.
+	 */
+	handleTransferCancelled(data) {
+		console.log('Transfer: Cancelled:', data);
+
+		// Close incoming transfer dialog if open
+		if (this.incomingCallDialog) {
+			this.incomingCallDialog.hide();
+			this.incomingCallDialog = null;
+		}
+		this.stopRingtone();
+
+		frappe.show_alert({
+			message: data.message || __('Transfer was cancelled'),
+			indicator: 'orange'
+		}, 5);
+
+		this._activeTransferId = null;
 	}
 }
 

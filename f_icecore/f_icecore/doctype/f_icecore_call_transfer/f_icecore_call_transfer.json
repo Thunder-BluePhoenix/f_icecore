@@ -1,0 +1,134 @@
+{
+ "actions": [],
+ "autoname": "format:XFER-{YYYY}-{#####}",
+ "creation": "2025-02-09 12:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "original_call",
+  "transfer_type",
+  "status",
+  "column_break_1",
+  "from_user",
+  "to_user",
+  "transfer_target",
+  "section_break_timing",
+  "initiated_at",
+  "completed_at",
+  "column_break_2",
+  "new_call_session",
+  "reason",
+  "metadata"
+ ],
+ "fields": [
+  {
+   "fieldname": "original_call",
+   "fieldtype": "Link",
+   "label": "Original Call",
+   "options": "F IceCore Call Session",
+   "reqd": 1,
+   "description": "The call session being transferred"
+  },
+  {
+   "default": "blind",
+   "fieldname": "transfer_type",
+   "fieldtype": "Select",
+   "label": "Transfer Type",
+   "options": "blind\nattended",
+   "reqd": 1,
+   "description": "Blind: directly transfer. Attended: consult first, then transfer."
+  },
+  {
+   "default": "Initiated",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Initiated\nRinging\nCompleted\nRejected\nFailed\nCancelled"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "from_user",
+   "fieldtype": "Link",
+   "label": "From User",
+   "options": "User",
+   "reqd": 1,
+   "description": "The user initiating the transfer (transferring the call away)"
+  },
+  {
+   "fieldname": "to_user",
+   "fieldtype": "Link",
+   "label": "To User",
+   "options": "User",
+   "reqd": 1,
+   "description": "The other party in the original call (being transferred)"
+  },
+  {
+   "fieldname": "transfer_target",
+   "fieldtype": "Link",
+   "label": "Transfer Target",
+   "options": "User",
+   "reqd": 1,
+   "description": "The user the call is being transferred to"
+  },
+  {
+   "fieldname": "section_break_timing",
+   "fieldtype": "Section Break",
+   "label": "Transfer Details"
+  },
+  {
+   "fieldname": "initiated_at",
+   "fieldtype": "Datetime",
+   "label": "Initiated At"
+  },
+  {
+   "fieldname": "completed_at",
+   "fieldtype": "Datetime",
+   "label": "Completed At"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "new_call_session",
+   "fieldtype": "Link",
+   "label": "New Call Session",
+   "options": "F IceCore Call Session",
+   "description": "The new call session created after transfer"
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason",
+   "description": "Reason for the transfer"
+  },
+  {
+   "fieldname": "metadata",
+   "fieldtype": "Long Text",
+   "label": "Metadata"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2025-02-09 12:00:00",
+ "modified_by": "Administrator",
+ "module": "F Icecore",
+ "name": "F IceCore Call Transfer",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "role": "All",
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

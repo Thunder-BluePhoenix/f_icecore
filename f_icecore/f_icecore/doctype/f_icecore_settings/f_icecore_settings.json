@@ -27,6 +27,9 @@
   "max_call_duration",
   "enable_call_history",
   "cleanup_old_calls",
+  "enable_call_recording",
+  "enable_call_transfer",
+  "cleanup_old_recordings",
   "advanced_section",
   "custom_ringtone",
   "custom_calling_tone",
@@ -180,6 +183,27 @@
    "description": "Automatically delete call history older than this many days (0 = never delete)"
   },
   {
+   "default": "1",
+   "fieldname": "enable_call_recording",
+   "fieldtype": "Check",
+   "label": "Enable Call Recording",
+   "description": "Allow users to record calls locally (audio/video). Recordings are saved as WebM files."
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_call_transfer",
+   "fieldtype": "Check",
+   "label": "Enable Call Transfer",
+   "description": "Allow users to transfer active calls to other users (blind and attended transfer)"
+  },
+  {
+   "default": "30",
+   "fieldname": "cleanup_old_recordings",
+   "fieldtype": "Int",
+   "label": "Cleanup Old Recordings (days)",
+   "description": "Automatically delete call recordings older than this many days (0 = never delete)"
+  },
+  {
    "collapsible": 1,
    "fieldname": "advanced_section",
    "fieldtype": "Section Break",
@@ -219,7 +243,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2025-02-09 10:00:00",
+ "modified": "2025-02-09 14:00:00",
  "modified_by": "Administrator",
  "module": "F Icecore",
  "name": "F IceCore Settings",

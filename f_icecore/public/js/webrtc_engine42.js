@@ -35,6 +35,12 @@ class FIceCoreWebRTC {
 		this.onError = null;
 		this.onConnectionStateChange = null;
 
+		// Call Recording state
+		this._mediaRecorder = null;
+		this._recordedChunks = [];
+		this._recordingId = null;
+		this._isRecording = false;
+
 		// Initialize
 		this.init();
 	}
@@ -184,6 +190,11 @@ class FIceCoreWebRTC {
 					'call_ended': 6,
 					'f_icecore:group_participant_left': 6,
 					'f_icecore:group_call_ended': 6,
+					'f_icecore:transfer_incoming': 1,
+					'f_icecore:transfer_notify': 5,
+					'f_icecore:transfer_completed': 1,
+					'f_icecore:transfer_failed': 5,
+					'f_icecore:transfer_cancelled': 5,
 					'f_icecore:test_ping': 7
 				};
 				signals.sort((a, b) => {
@@ -356,6 +367,45 @@ class FIceCoreWebRTC {
 				}
 				break;
 
+			// ============================================================
+			// Call Transfer Events
+			// ============================================================
+
+			case 'f_icecore:transfer_incoming':
+				console.log('📡 [POLL] Transfer incoming:', message.transfer_id);
+				if (window.FIceCoreUI && window.FIceCoreUI.handleTransferIncoming) {
+					window.FIceCoreUI.handleTransferIncoming(message);
+				}
+				break;
+
+			case 'f_icecore:transfer_notify':
+				console.log('📡 [POLL] Transfer notify:', message.transfer_id);
+				if (window.FIceCoreUI && window.FIceCoreUI.handleTransferNotify) {
+					window.FIceCoreUI.handleTransferNotify(message);
+				}
+				break;
+
+			case 'f_icecore:transfer_completed':
+				console.log('📡 [POLL] Transfer completed:', message.transfer_id);
+				if (window.FIceCoreUI && window.FIceCoreUI.handleTransferCompleted) {
+					window.FIceCoreUI.handleTransferCompleted(message);
+				}
+				break;
+
+			case 'f_icecore:transfer_failed':
+				console.log('📡 [POLL] Transfer failed:', message.transfer_id);
+				if (window.FIceCoreUI && window.FIceCoreUI.handleTransferFailed) {
+					window.FIceCoreUI.handleTransferFailed(message);
+				}
+				break;
+
+			case 'f_icecore:transfer_cancelled':
+				console.log('📡 [POLL] Transfer cancelled:', message.transfer_id);
+				if (window.FIceCoreUI && window.FIceCoreUI.handleTransferCancelled) {
+					window.FIceCoreUI.handleTransferCancelled(message);
+				}
+				break;
+
 			default:
 				console.log(`📡 [POLL] Unknown signal event: ${event}`);
 				break;
@@ -416,6 +466,42 @@ class FIceCoreWebRTC {
 		frappe.realtime.on(`f_icecore:call_ended:${user}`, (data) => {
 			console.log('Call ended by:', data.ended_by);
 			this.endCall();
+		});
+
+		// Listen for transfer events (SocketIO path)
+		frappe.realtime.on('f_icecore:transfer_incoming', (data) => {
+			console.log('Transfer incoming (SocketIO):', data);
+			if (window.FIceCoreUI?.handleTransferIncoming) {
+				window.FIceCoreUI.handleTransferIncoming(data);
+			}
+		});
+
+		frappe.realtime.on('f_icecore:transfer_notify', (data) => {
+			console.log('Transfer notify (SocketIO):', data);
+			if (window.FIceCoreUI?.handleTransferNotify) {
+				window.FIceCoreUI.handleTransferNotify(data);
+			}
+		});
+
+		frappe.realtime.on('f_icecore:transfer_completed', (data) => {
+			console.log('Transfer completed (SocketIO):', data);
+			if (window.FIceCoreUI?.handleTransferCompleted) {
+				window.FIceCoreUI.handleTransferCompleted(data);
+			}
+		});
+
+		frappe.realtime.on('f_icecore:transfer_failed', (data) => {
+			console.log('Transfer failed (SocketIO):', data);
+			if (window.FIceCoreUI?.handleTransferFailed) {
+				window.FIceCoreUI.handleTransferFailed(data);
+			}
+		});
+
+		frappe.realtime.on('f_icecore:transfer_cancelled', (data) => {
+			console.log('Transfer cancelled (SocketIO):', data);
+			if (window.FIceCoreUI?.handleTransferCancelled) {
+				window.FIceCoreUI.handleTransferCancelled(data);
+			}
 		});
 	}
 
@@ -1359,6 +1445,11 @@ class FIceCoreWebRTC {
 	// ============================================================
 
 	async endCall() {
+		// Stop recording if active
+		if (this._isRecording) {
+			await this.stopRecording();
+		}
+
 		// Stop screen sharing if active
 		if (this._isScreenSharing) {
 			if (this._screenStream) {
@@ -1444,6 +1535,256 @@ class FIceCoreWebRTC {
 		frappe.call({
 			method: 'f_icecore.f_icecore.api.presence.heartbeat'
 		});
+	}
+
+	// ============================================================
+	// Call Recording (MediaRecorder API)
+	// ============================================================
+
+	/**
+	 * Start recording the current call.
+	 * Uses MediaRecorder API to capture both local and remote audio/video
+	 * into a combined MediaStream, then records it as WebM.
+	 *
+	 * Returns true on success, false on failure.
+	 */
+	async startRecording() {
+		try {
+			if (this._isRecording) {
+				console.log('Already recording');
+				return false;
+			}
+
+			if (!this.peerConnection) {
+				console.error('No active peer connection to record');
+				return false;
+			}
+
+			console.log('Recording: Starting call recording...');
+
+			// Create a combined stream with both local and remote audio/video
+			const combinedStream = new MediaStream();
+
+			// Add remote tracks (this is what we hear/see from the other person)
+			if (this.remoteStream) {
+				this.remoteStream.getTracks().forEach(track => {
+					combinedStream.addTrack(track);
+				});
+			}
+
+			// Add local audio tracks (our own voice)
+			if (this.localStream) {
+				this.localStream.getAudioTracks().forEach(track => {
+					combinedStream.addTrack(track);
+				});
+			}
+
+			if (combinedStream.getTracks().length === 0) {
+				console.error('No tracks available to record');
+				return false;
+			}
+
+			// Determine the best supported MIME type
+			let mimeType = 'audio/webm;codecs=opus';
+			const hasVideo = combinedStream.getVideoTracks().length > 0;
+			if (hasVideo) {
+				if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')) {
+					mimeType = 'video/webm;codecs=vp9,opus';
+				} else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {
+					mimeType = 'video/webm;codecs=vp8,opus';
+				} else if (MediaRecorder.isTypeSupported('video/webm')) {
+					mimeType = 'video/webm';
+				}
+			} else {
+				if (!MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+					if (MediaRecorder.isTypeSupported('audio/webm')) {
+						mimeType = 'audio/webm';
+					} else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+						mimeType = 'audio/ogg;codecs=opus';
+					}
+				}
+			}
+
+			console.log('Recording: Using MIME type:', mimeType);
+
+			// Create MediaRecorder
+			this._recordedChunks = [];
+			this._mediaRecorder = new MediaRecorder(combinedStream, {
+				mimeType: mimeType,
+				audioBitsPerSecond: 128000,
+				videoBitsPerSecond: hasVideo ? 2500000 : undefined
+			});
+
+			this._mediaRecorder.ondataavailable = (event) => {
+				if (event.data && event.data.size > 0) {
+					this._recordedChunks.push(event.data);
+				}
+			};
+
+			this._mediaRecorder.onstop = () => {
+				console.log('Recording: MediaRecorder stopped, chunks:', this._recordedChunks.length);
+				this._saveRecording();
+			};
+
+			this._mediaRecorder.onerror = (event) => {
+				console.error('Recording: MediaRecorder error:', event.error);
+				this._isRecording = false;
+			};
+
+			// Start recording — collect data every 1 second
+			this._mediaRecorder.start(1000);
+			this._isRecording = true;
+
+			// Create recording document in backend
+			const callType = hasVideo ? 'video' : 'audio';
+			try {
+				const response = await frappe.call({
+					method: 'f_icecore.f_icecore.api.call_recording.start_recording',
+					args: {
+						call_id: this.callId,
+						call_type: callType
+					}
+				});
+				if (response.message?.success) {
+					this._recordingId = response.message.recording_id;
+					console.log('Recording: Backend recording ID:', this._recordingId);
+				}
+			} catch (e) {
+				console.warn('Recording: Failed to create backend record:', e);
+			}
+
+			console.log('Recording: Call recording started successfully');
+			return true;
+
+		} catch (error) {
+			console.error('Recording: Failed to start recording:', error);
+			this._isRecording = false;
+			return false;
+		}
+	}
+
+	/**
+	 * Stop recording the current call.
+	 */
+	async stopRecording() {
+		try {
+			if (!this._isRecording || !this._mediaRecorder) {
+				return;
+			}
+
+			console.log('Recording: Stopping call recording...');
+
+			// Stop MediaRecorder — triggers onstop which calls _saveRecording
+			if (this._mediaRecorder.state !== 'inactive') {
+				this._mediaRecorder.stop();
+			}
+
+			this._isRecording = false;
+
+			// Notify backend
+			if (this._recordingId) {
+				try {
+					await frappe.call({
+						method: 'f_icecore.f_icecore.api.call_recording.stop_recording',
+						args: { recording_id: this._recordingId }
+					});
+				} catch (e) {
+					console.warn('Recording: Failed to notify backend about stop:', e);
+				}
+			}
+
+			console.log('Recording: Call recording stopped');
+
+		} catch (error) {
+			console.error('Recording: Failed to stop recording:', error);
+		}
+	}
+
+	/**
+	 * Save the recorded chunks as a file and upload to backend.
+	 * Called automatically when MediaRecorder stops.
+	 */
+	async _saveRecording() {
+		try {
+			if (this._recordedChunks.length === 0) {
+				console.warn('Recording: No recorded data to save');
+				return;
+			}
+
+			const blob = new Blob(this._recordedChunks, {
+				type: this._mediaRecorder?.mimeType || 'audio/webm'
+			});
+
+			console.log('Recording: Created blob, size:', blob.size, 'bytes');
+
+			if (!this._recordingId) {
+				// No backend record — just offer download
+				this._downloadRecording(blob);
+				return;
+			}
+
+			// Convert blob to base64 and upload
+			const reader = new FileReader();
+			reader.onload = async () => {
+				try {
+					const base64 = reader.result.split(',')[1]; // Remove data URL prefix
+
+					const response = await frappe.call({
+						method: 'f_icecore.f_icecore.api.call_recording.save_recording_blob',
+						args: {
+							recording_id: this._recordingId,
+							blob_b64: base64
+						}
+					});
+
+					if (response.message?.success) {
+						console.log('Recording: File uploaded successfully:', response.message.file_url);
+						frappe.show_alert({
+							message: __('Call recording saved successfully'),
+							indicator: 'green'
+						}, 5);
+					}
+				} catch (e) {
+					console.error('Recording: Failed to upload recording:', e);
+					// Fallback: offer download
+					this._downloadRecording(blob);
+				}
+			};
+			reader.readAsDataURL(blob);
+
+			// Cleanup
+			this._recordedChunks = [];
+
+		} catch (error) {
+			console.error('Recording: Failed to save recording:', error);
+		}
+	}
+
+	/**
+	 * Fallback: download the recording as a file if upload fails.
+	 */
+	_downloadRecording(blob) {
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		const ext = blob.type.includes('video') ? 'webm' : 'webm';
+		a.download = `call_recording_${new Date().toISOString().replace(/[:.]/g, '-')}.${ext}`;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+
+		frappe.show_alert({
+			message: __('Recording downloaded to your device'),
+			indicator: 'blue'
+		}, 5);
+	}
+
+	/**
+	 * Check if currently recording.
+	 */
+	isRecording() {
+		return this._isRecording;
 	}
 }
 
