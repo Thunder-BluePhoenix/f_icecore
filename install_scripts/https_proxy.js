@@ -73,7 +73,7 @@ function rewriteHeadersForSocketIO(headers) {
 // --- Helper: Rewrite CORS response headers ---
 // SocketIO server echoes back the rewritten origin (http://127.0.0.1:8002)
 // in Access-Control-Allow-Origin, but the browser's actual origin is
-// https://192.168.31.223:8443. We must fix this mismatch.
+// https://192.168.31.133:8443. We must fix this mismatch.
 function fixCorsHeaders(responseHeaders, clientOrigin) {
     const fixed = { ...responseHeaders };
     if (clientOrigin && fixed['access-control-allow-origin']) {
@@ -211,11 +211,11 @@ socketProxy.listen(SOCKETIO_HTTPS_PORT, BIND_HOST, () => {
     console.log(`   wss://0.0.0.0:${SOCKETIO_HTTPS_PORT} → ws://127.0.0.1:${SOCKETIO_HTTP_PORT}`);
     console.log(`   (headers rewritten + CORS fixed)`);
     console.log(`\n📱 Mobile Access URLs:`);
-    console.log(`   Web:      https://192.168.31.223:${WEB_HTTPS_PORT}`);
-    console.log(`   SocketIO: wss://192.168.31.223:${SOCKETIO_HTTPS_PORT}`);
-    console.log(`\n💡 On mobile, visit https://192.168.31.223:${WEB_HTTPS_PORT}`);
+    console.log(`   Web:      https://192.168.31.133:${WEB_HTTPS_PORT}`);
+    console.log(`   SocketIO: wss://192.168.31.133:${SOCKETIO_HTTPS_PORT}`);
+    console.log(`\n💡 On mobile, visit https://192.168.31.133:${WEB_HTTPS_PORT}`);
     console.log(`   Accept the self-signed certificate warning to proceed.`);
-    console.log(`   Then also visit https://192.168.31.223:${SOCKETIO_HTTPS_PORT}`);
+    console.log(`   Then also visit https://192.168.31.133:${SOCKETIO_HTTPS_PORT}`);
     console.log(`   and accept the cert there too (for SocketIO to work).\n`);
 });
 

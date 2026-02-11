@@ -1,0 +1,149 @@
+{
+ "actions": [],
+ "autoname": "format:REC-{YYYY}-{#####}",
+ "creation": "2025-02-09 12:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "call_session",
+  "group_call_session",
+  "column_break_1",
+  "recorded_by",
+  "call_type",
+  "status",
+  "section_break_recording",
+  "recording_file",
+  "file_size",
+  "column_break_2",
+  "duration",
+  "format",
+  "started_at",
+  "ended_at",
+  "section_break_metadata",
+  "participants",
+  "metadata"
+ ],
+ "fields": [
+  {
+   "fieldname": "call_session",
+   "fieldtype": "Link",
+   "label": "Call Session",
+   "options": "F IceCore Call Session",
+   "description": "1:1 call session (if applicable)"
+  },
+  {
+   "fieldname": "group_call_session",
+   "fieldtype": "Link",
+   "label": "Group Call Session",
+   "options": "F IceCore Group Call Session",
+   "description": "Group call session (if applicable)"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "recorded_by",
+   "fieldtype": "Link",
+   "label": "Recorded By",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "call_type",
+   "fieldtype": "Select",
+   "label": "Call Type",
+   "options": "audio\nvideo\nscreen",
+   "reqd": 1
+  },
+  {
+   "default": "Recording",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Recording\nCompleted\nFailed\nDeleted"
+  },
+  {
+   "fieldname": "section_break_recording",
+   "fieldtype": "Section Break",
+   "label": "Recording Details"
+  },
+  {
+   "fieldname": "recording_file",
+   "fieldtype": "Attach",
+   "label": "Recording File",
+   "description": "The recorded media file (WebM format)"
+  },
+  {
+   "fieldname": "file_size",
+   "fieldtype": "Int",
+   "label": "File Size (bytes)",
+   "description": "Size of the recording file in bytes"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "duration",
+   "fieldtype": "Int",
+   "label": "Duration (seconds)",
+   "description": "Duration of the recording in seconds"
+  },
+  {
+   "default": "webm",
+   "fieldname": "format",
+   "fieldtype": "Select",
+   "label": "Format",
+   "options": "webm\nmp4\nogg"
+  },
+  {
+   "fieldname": "started_at",
+   "fieldtype": "Datetime",
+   "label": "Started At"
+  },
+  {
+   "fieldname": "ended_at",
+   "fieldtype": "Datetime",
+   "label": "Ended At"
+  },
+  {
+   "fieldname": "section_break_metadata",
+   "fieldtype": "Section Break",
+   "label": "Additional Info",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "participants",
+   "fieldtype": "Small Text",
+   "label": "Participants",
+   "description": "JSON array of participant emails in the recorded call"
+  },
+  {
+   "fieldname": "metadata",
+   "fieldtype": "Long Text",
+   "label": "Metadata"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2025-02-09 12:00:00",
+ "modified_by": "Administrator",
+ "module": "F Icecore",
+ "name": "F IceCore Call Recording",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "All",
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

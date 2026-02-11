@@ -79,9 +79,16 @@ f_icecore.init_navbar = function() {
 		</li>
 	`);
 
-	// Click handler — opens call panel, or reopens ongoing call window
+	// Click handler — opens call panel, or reopens ongoing call window / floating widget
 	$btn.find('a').on('click', function(e) {
 		e.preventDefault();
+
+		// Check if there's a minimized call (floating widget)
+		if (window.FIceCoreUI?.isCallMinimized()) {
+			console.log('📞 F-IceCore: Restoring from floating widget');
+			window.FIceCoreUI._restoreFromWidget();
+			return;
+		}
 
 		// Check if there's an ongoing call and the window was closed/hidden
 		const hasActive1to1 = window.FIceCore?.peerConnection && window.FIceCore?.callId;

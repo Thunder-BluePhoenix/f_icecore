@@ -28,11 +28,12 @@ add_to_apps_screen = [
 # include js, css files in header of desk.html
 app_include_css = "/assets/f_icecore/css/f_icecore.css"
 app_include_js = [
-	"/assets/f_icecore/js/webrtc_engine42.js",    # WebRTC engine - With HTTP polling fallback!
-	"/assets/f_icecore/js/group_webrtc_engine02.js", # Group call mesh WebRTC engine
-	"/assets/f_icecore/js/call_ui47.js",           # Call UI - With HTTP polling fallback!
-	"/assets/f_icecore/js/f_icecore.bundle30.js",  # Additional features
-	"/assets/f_icecore/js/f_icecore_boot27.js"     # Navbar with pending calls + search/multi-select
+	"/assets/f_icecore/js/webrtc_engine42.js",       # WebRTC engine - With HTTP polling fallback!
+	"/assets/f_icecore/js/group_webrtc_engine02.js",  # Group call mesh WebRTC engine
+	"/assets/f_icecore/js/noise_cancellation01.js",   # Noise cancellation engine (Web Audio API)
+	"/assets/f_icecore/js/call_ui47.js",              # Call UI - With minimize, noise cancel, HTTP polling!
+	"/assets/f_icecore/js/f_icecore.bundle30.js",     # Additional features
+	"/assets/f_icecore/js/f_icecore_boot27.js"        # Navbar with pending calls + search/multi-select
 ]
 
 # include js, css files in header of web template
@@ -160,7 +161,8 @@ scheduler_events = {
 		"f_icecore.f_icecore.api.presence.cleanup_stale_presence"
 	],
 	"hourly": [
-		"f_icecore.f_icecore.api.call_session.cleanup_old_sessions"
+		"f_icecore.f_icecore.api.call_session.cleanup_old_sessions",
+		"f_icecore.f_icecore.api.call_recording.cleanup_old_recordings"
 	],
 }
 

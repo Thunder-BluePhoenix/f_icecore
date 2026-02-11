@@ -18,6 +18,17 @@ class FIceCoreCallUI {
 		this.callingTone = null;
 		this.pendingCalls = []; // Track pending incoming calls
 
+		// Floating widget state (minimize/restore)
+		this._floatingWidget = null;
+		this._isMinimized = false;
+		this._floatingWidgetDuration = 0;
+		this._floatingWidgetTimerInterval = null;
+		this._minimizedCallContext = null; // stores {remoteUser, callType, callId, isGroup}
+		this._widgetDragState = null;
+
+		// Noise cancellation state
+		this._noiseCancelEnabled = false;
+
 		console.log('🔵 F-IceCore CallUI: Calling init()...');
 		this.init();
 		console.log('✅ F-IceCore CallUI: Constructor completed');
@@ -174,6 +185,161 @@ class FIceCoreCallUI {
 			}
 			.video-container.focus-mode #remote-video {
 				object-fit: contain;
+			}
+
+			/* ===== Floating Call Widget (minimized state) ===== */
+			.f-icecore-floating-widget {
+				position: fixed;
+				bottom: 24px;
+				right: 24px;
+				width: 300px;
+				height: auto;
+				background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+				border-radius: 16px;
+				box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.08);
+				z-index: 10001;
+				cursor: grab;
+				user-select: none;
+				overflow: hidden;
+				animation: f-ic-widget-slide-in 0.3s ease-out;
+				transition: box-shadow 0.3s ease;
+			}
+			.f-icecore-floating-widget:hover {
+				box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.15);
+			}
+			.f-icecore-floating-widget:active {
+				cursor: grabbing;
+			}
+			.f-icecore-floating-widget .widget-call-pulse {
+				position: absolute;
+				top: 12px;
+				left: 12px;
+				width: 10px;
+				height: 10px;
+				background: #43b581;
+				border-radius: 50%;
+				animation: pulse-green 2s infinite;
+			}
+			.f-icecore-floating-widget .widget-header {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				padding: 12px 14px;
+				cursor: grab;
+			}
+			.f-icecore-floating-widget .widget-header:active {
+				cursor: grabbing;
+			}
+			.f-icecore-floating-widget .widget-avatar {
+				width: 36px;
+				height: 36px;
+				border-radius: 50%;
+				border: 2px solid #43b581;
+				overflow: hidden;
+				flex-shrink: 0;
+			}
+			.f-icecore-floating-widget .widget-avatar img,
+			.f-icecore-floating-widget .widget-avatar .avatar {
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+			}
+			.f-icecore-floating-widget .widget-info {
+				flex: 1;
+				min-width: 0;
+				color: #e0e0e0;
+			}
+			.f-icecore-floating-widget .widget-user-name {
+				font-size: 13px;
+				font-weight: 600;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				color: #fff;
+			}
+			.f-icecore-floating-widget .widget-call-info {
+				font-size: 11px;
+				color: #8b95a5;
+				display: flex;
+				align-items: center;
+				gap: 6px;
+			}
+			.f-icecore-floating-widget .widget-duration {
+				font-weight: 600;
+				color: #43b581;
+				font-variant-numeric: tabular-nums;
+			}
+			.f-icecore-floating-widget .widget-controls {
+				display: flex;
+				justify-content: center;
+				gap: 10px;
+				padding: 0 14px 12px;
+			}
+			.f-icecore-floating-widget .widget-btn {
+				width: 40px;
+				height: 40px;
+				border-radius: 50%;
+				border: none;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				cursor: pointer;
+				transition: transform 0.15s ease, background 0.2s ease;
+				font-size: 15px;
+				color: white;
+			}
+			.f-icecore-floating-widget .widget-btn:hover {
+				transform: scale(1.1);
+			}
+			.f-icecore-floating-widget .widget-btn.btn-expand {
+				background: rgba(255, 255, 255, 0.12);
+			}
+			.f-icecore-floating-widget .widget-btn.btn-expand:hover {
+				background: rgba(255, 255, 255, 0.22);
+			}
+			.f-icecore-floating-widget .widget-btn.btn-mute {
+				background: rgba(255, 255, 255, 0.12);
+			}
+			.f-icecore-floating-widget .widget-btn.btn-mute.muted {
+				background: rgba(255, 165, 0, 0.7);
+			}
+			.f-icecore-floating-widget .widget-btn.btn-mute:hover {
+				background: rgba(255, 255, 255, 0.22);
+			}
+			.f-icecore-floating-widget .widget-btn.btn-hangup {
+				background: #f04747;
+			}
+			.f-icecore-floating-widget .widget-btn.btn-hangup:hover {
+				background: #d83c3c;
+			}
+			@keyframes f-ic-widget-slide-in {
+				from {
+					transform: translateY(80px) scale(0.9);
+					opacity: 0;
+				}
+				to {
+					transform: translateY(0) scale(1);
+					opacity: 1;
+				}
+			}
+			@keyframes f-ic-widget-slide-out {
+				from {
+					transform: translateY(0) scale(1);
+					opacity: 1;
+				}
+				to {
+					transform: translateY(80px) scale(0.9);
+					opacity: 0;
+				}
+			}
+
+			/* Mobile floating widget */
+			@media (max-width: 768px) {
+				.f-icecore-floating-widget {
+					width: 260px;
+					bottom: 16px;
+					right: 16px;
+				}
 			}
 
 			/* Restore PIP indicator (when PIP is hidden) */
@@ -646,12 +812,17 @@ class FIceCoreCallUI {
 				}
 			],
 			on_hide: () => {
-				// If call is still active, show a hint to the user
-				if (window.FIceCore?.peerConnection && window.FIceCore?.callId) {
-					frappe.show_alert({
-						message: __('Call is still active. Click the phone icon to reopen.'),
-						indicator: 'blue'
-					}, 5);
+				// If call is still active and not already minimized, create floating widget
+				if (window.FIceCore?.peerConnection && window.FIceCore?.callId && !this._isMinimized) {
+					// Dialog is already being hidden by Frappe, just create the widget
+					this._isMinimized = true;
+					this._minimizedCallContext = { remoteUser, callType, callId, isGroup: false };
+					// Clean up backdrop/body that modal('hide') might leave behind
+					setTimeout(() => {
+						$('body').removeClass('modal-open').css('overflow', '');
+						$('.modal-backdrop').remove();
+					}, 300);
+					this._createFloatingWidget(remoteUser, callType, callId, false);
 				}
 			}
 		});
@@ -729,8 +900,20 @@ class FIceCoreCallUI {
 						<button class="btn btn-info btn-lg" id="toggle-screen-share-btn" title="${__('Share your screen during this call')}">
 							<i class="fa fa-desktop"></i> ${__('Share Screen')}
 						</button>
+						<button class="btn btn-secondary btn-lg" id="toggle-noise-cancel-btn" title="${__('Toggle AI noise cancellation')}">
+							<i class="fa fa-assistive-listening-systems"></i> ${__('Noise Cancel')}
+						</button>
+						<button class="btn btn-secondary btn-lg" id="toggle-record-btn" title="${__('Record this call')}">
+							<i class="fa fa-circle" style="color: #dc3545;"></i> ${__('Record')}
+						</button>
+						<button class="btn btn-secondary btn-lg" id="transfer-call-btn" title="${__('Transfer this call to another user')}">
+							<i class="fa fa-exchange"></i> ${__('Transfer')}
+						</button>
 						<button class="btn btn-primary btn-lg" id="add-participant-btn" title="${__('Add another person to this call')}">
 							<i class="fa fa-user-plus"></i> ${__('Add')}
+						</button>
+						<button class="btn btn-secondary btn-lg" id="minimize-call-btn" title="${__('Minimize call to floating widget')}">
+							<i class="fa fa-window-minimize"></i> ${__('Minimize')}
 						</button>
 						<button class="btn btn-danger btn-lg" id="f-icecore-hangup-btn">
 							<i class="fa fa-phone" style="transform: rotate(135deg);"></i> ${__('End Call')}
@@ -753,11 +936,26 @@ class FIceCoreCallUI {
 			$content.find('#toggle-screen-share-btn').on('click', () => {
 				window.FIceCoreUI.toggleScreenShare();
 			});
+			$content.find('#toggle-noise-cancel-btn').on('click', () => {
+				window.FIceCoreUI.toggleNoiseCancellation();
+			});
+			$content.find('#toggle-record-btn').on('click', () => {
+				window.FIceCoreUI.toggleRecording();
+			});
+			$content.find('#transfer-call-btn').on('click', () => {
+				window.FIceCoreUI.showTransferDialog(callId, remoteUser, callType);
+			});
 			$content.find('#f-icecore-hangup-btn').on('click', () => {
 				window.FIceCoreUI.hangup();
 			});
 			$content.find('#add-participant-btn').on('click', () => {
 				window.FIceCoreUI.showAddParticipantDialog(callId, remoteUser, callType);
+			});
+			$content.find('#minimize-call-btn').on('click', () => {
+				// Just hide the dialog — on_hide will create the floating widget
+				if (window.FIceCoreUI.currentCallWindow) {
+					window.FIceCoreUI.currentCallWindow.hide();
+				}
 			});
 
 			// Store current 1:1 call context for add-participant
@@ -895,12 +1093,20 @@ class FIceCoreCallUI {
 			this.stopCallingTone();
 			this.stopDurationTimer();
 
+			// Remove floating widget if minimized
+			this._removeFloatingWidget();
+
+			// Destroy noise cancellation pipeline
+			this._destroyNoiseCancellation();
+
 			if (this._streamAttachInterval) {
 				clearInterval(this._streamAttachInterval);
 				this._streamAttachInterval = null;
 			}
 
 			if (this.currentCallWindow) {
+				// Temporarily remove on_hide to prevent minimize on hangup
+				this.currentCallWindow.on_hide = null;
 				this.currentCallWindow.hide();
 				this.currentCallWindow = null;
 			}
@@ -925,6 +1131,12 @@ class FIceCoreCallUI {
 		this.stopCallingTone();
 		this.stopDurationTimer();
 
+		// Remove floating widget if minimized
+		this._removeFloatingWidget();
+
+		// Destroy noise cancellation pipeline
+		this._destroyNoiseCancellation();
+
 		if (this._streamAttachInterval) {
 			clearInterval(this._streamAttachInterval);
 			this._streamAttachInterval = null;
@@ -936,6 +1148,8 @@ class FIceCoreCallUI {
 		}
 
 		if (this.currentCallWindow) {
+			// Temporarily remove on_hide to prevent minimize on end
+			this.currentCallWindow.on_hide = null;
 			this.currentCallWindow.hide();
 			this.currentCallWindow = null;
 		}
@@ -1597,12 +1811,20 @@ class FIceCoreCallUI {
 				}
 			],
 			on_hide: () => {
-				// If group call is still active, show a hint
-				if (window.FIceCoreGroup?.isInGroupCall) {
-					frappe.show_alert({
-						message: __('Group call is still active. Click the phone icon to reopen.'),
-						indicator: 'blue'
-					}, 5);
+				// If group call is still active and not already minimized, create floating widget
+				if (window.FIceCoreGroup?.isInGroupCall && !this._isMinimized) {
+					const participantNames = Array.from(this._groupParticipants || [])
+						.filter(p => p !== frappe.session.user)
+						.map(p => frappe.boot.user_info[p]?.fullname || p)
+						.join(', ');
+					this._isMinimized = true;
+					this._minimizedCallContext = { remoteUser: participantNames, callType, callId: groupCallId, isGroup: true };
+					// Clean up backdrop/body that modal('hide') might leave behind
+					setTimeout(() => {
+						$('body').removeClass('modal-open').css('overflow', '');
+						$('.modal-backdrop').remove();
+					}, 300);
+					this._createFloatingWidget(participantNames, callType, groupCallId, true);
 				}
 			}
 		});
@@ -1668,8 +1890,14 @@ class FIceCoreCallUI {
 						<button class="btn btn-info btn-lg" id="group-toggle-screen-share-btn" title="${__('Share your screen during this call')}">
 							<i class="fa fa-desktop"></i> ${__('Share Screen')}
 						</button>
+						<button class="btn btn-secondary btn-lg" id="group-toggle-noise-cancel-btn" title="${__('Toggle AI noise cancellation')}">
+							<i class="fa fa-assistive-listening-systems"></i> ${__('Noise Cancel')}
+						</button>
 						<button class="btn btn-primary btn-lg" id="group-add-participant-btn" title="${__('Add another person to this call')}">
 							<i class="fa fa-user-plus"></i> ${__('Add')}
+						</button>
+						<button class="btn btn-secondary btn-lg" id="group-minimize-call-btn" title="${__('Minimize call to floating widget')}">
+							<i class="fa fa-window-minimize"></i> ${__('Minimize')}
 						</button>
 						<button class="btn btn-danger btn-lg" id="group-hangup-btn">
 							<i class="fa fa-phone" style="transform: rotate(135deg);"></i> ${__('Leave Call')}
@@ -1692,11 +1920,20 @@ class FIceCoreCallUI {
 			$content.find('#group-toggle-screen-share-btn').on('click', () => {
 				this.toggleGroupScreenShare();
 			});
+			$content.find('#group-toggle-noise-cancel-btn').on('click', () => {
+				this.toggleNoiseCancellation();
+			});
 			$content.find('#group-hangup-btn').on('click', () => {
 				this.hangupGroupCall();
 			});
 			$content.find('#group-add-participant-btn').on('click', () => {
 				this.showAddParticipantDialog(null, null, callType);
+			});
+			$content.find('#group-minimize-call-btn').on('click', () => {
+				// Just hide the dialog — on_hide will create the floating widget
+				if (this.currentCallWindow) {
+					this.currentCallWindow.hide();
+				}
 			});
 
 			// Attach local stream
@@ -1932,8 +2169,11 @@ class FIceCoreCallUI {
 		console.log('📞 [Group UI] Hanging up group call');
 
 		this._groupStopDurationTimer();
+		this._removeFloatingWidget();
+		this._destroyNoiseCancellation();
 
 		if (this.currentCallWindow) {
+			this.currentCallWindow.on_hide = null;
 			this.currentCallWindow.hide();
 			this.currentCallWindow = null;
 		}
@@ -1953,8 +2193,11 @@ class FIceCoreCallUI {
 		console.log('📵 [Group UI] Group call ended');
 
 		this._groupStopDurationTimer();
+		this._removeFloatingWidget();
+		this._destroyNoiseCancellation();
 
 		if (this.currentCallWindow) {
+			this.currentCallWindow.on_hide = null;
 			this.currentCallWindow.hide();
 			this.currentCallWindow = null;
 		}
@@ -2412,6 +2655,1055 @@ class FIceCoreCallUI {
 			});
 		} catch (error) {
 			console.error('Failed to update presence:', error);
+		}
+	}
+
+	// ============================================================
+	// Call Recording UI
+	// ============================================================
+
+	/**
+	 * Toggle call recording on/off.
+	 */
+	async toggleRecording() {
+		if (!window.FIceCore) {
+			console.warn('WebRTC engine not available');
+			return;
+		}
+
+		const btn = document.getElementById('toggle-record-btn');
+		if (btn) btn.disabled = true;
+
+		try {
+			if (window.FIceCore.isRecording()) {
+				await window.FIceCore.stopRecording();
+				this._updateRecordButton(false);
+				frappe.show_alert({
+					message: __('Recording stopped. File is being saved...'),
+					indicator: 'blue'
+				}, 5);
+			} else {
+				const started = await window.FIceCore.startRecording();
+				if (started) {
+					this._updateRecordButton(true);
+					frappe.show_alert({
+						message: __('Recording started'),
+						indicator: 'red'
+					}, 3);
+				} else {
+					frappe.show_alert({
+						message: __('Failed to start recording'),
+						indicator: 'red'
+					}, 5);
+				}
+			}
+		} catch (error) {
+			console.error('Recording toggle failed:', error);
+		} finally {
+			if (btn) btn.disabled = false;
+		}
+	}
+
+	/**
+	 * Update the record button appearance.
+	 */
+	_updateRecordButton(isRecording) {
+		const btn = document.getElementById('toggle-record-btn');
+		if (!btn) return;
+
+		if (isRecording) {
+			btn.className = 'btn btn-danger btn-lg';
+			btn.innerHTML = '<i class="fa fa-stop-circle"></i> ' + __('Stop Rec');
+			btn.title = __('Stop recording');
+		} else {
+			btn.className = 'btn btn-secondary btn-lg';
+			btn.innerHTML = '<i class="fa fa-circle" style="color: #dc3545;"></i> ' + __('Record');
+			btn.title = __('Record this call');
+		}
+	}
+
+	// ============================================================
+	// Call Transfer UI
+	// ============================================================
+
+	/**
+	 * Show the transfer dialog where user can search for a transfer target.
+	 */
+	showTransferDialog(callId, remoteUser, callType) {
+		console.log('Transfer: Opening transfer dialog', { callId, remoteUser, callType });
+
+		const _transferState = { query: '', debounceTimer: null };
+
+		const transferDialog = new frappe.ui.Dialog({
+			title: `<i class="fa fa-exchange"></i> ${__('Transfer Call')}`,
+			size: 'small',
+			fields: [
+				{
+					fieldtype: 'HTML',
+					fieldname: 'transfer_content'
+				}
+			]
+		});
+
+		transferDialog.show();
+
+		setTimeout(() => {
+			const $content = transferDialog.fields_dict.transfer_content.$wrapper;
+			$content.html(`
+				<div style="padding: 10px;">
+					<div style="margin-bottom: 15px;">
+						<p style="font-size: 12px; color: #888; margin-bottom: 10px;">
+							${__('Search for a user to transfer this call to. The other party will be connected to the selected user.')}
+						</p>
+					</div>
+					<div class="f-ic-search-container" style="margin-bottom: 15px;">
+						<input type="text" id="transfer-search" class="form-control"
+							placeholder="${__('Search by name, email, or phone...')}"
+							autocomplete="off" />
+					</div>
+					<div id="transfer-results" style="max-height: 300px; overflow-y: auto;">
+						<p style="text-align: center; color: #888; padding: 20px;">${__('Type to search for users...')}</p>
+					</div>
+				</div>
+			`);
+
+			// Search with debounce
+			$content.find('#transfer-search').on('input', (e) => {
+				const query = e.target.value.trim();
+				_transferState.query = query;
+				clearTimeout(_transferState.debounceTimer);
+				_transferState.debounceTimer = setTimeout(() => {
+					this._searchUsersForTransfer(query, $content, transferDialog, callId, remoteUser, callType);
+				}, 300);
+			});
+
+			$content.find('#transfer-search').focus();
+		}, 100);
+	}
+
+	/**
+	 * Search users for transfer target.
+	 */
+	async _searchUsersForTransfer(query, $content, transferDialog, callId, remoteUser, callType) {
+		if (!query || query.length < 1) {
+			$content.find('#transfer-results').html(
+				`<p style="text-align: center; color: #888; padding: 20px;">${__('Type to search for users...')}</p>`
+			);
+			return;
+		}
+
+		try {
+			const response = await frappe.call({
+				method: 'f_icecore.f_icecore.api.presence.search_users',
+				args: { query: query, page: 1, page_size: 8 }
+			});
+
+			const data = response.message;
+			const users = data.users || [];
+
+			if (users.length === 0) {
+				$content.find('#transfer-results').html(
+					`<p style="text-align: center; color: #888; padding: 20px;">${__('No users found')}</p>`
+				);
+				return;
+			}
+
+			// Filter out current user and the other party in the call
+			const currentUser = frappe.session.user;
+			const excludeUsers = [currentUser, remoteUser];
+			const filteredUsers = users.filter(u => !excludeUsers.includes(u.user));
+
+			if (filteredUsers.length === 0) {
+				$content.find('#transfer-results').html(
+					`<p style="text-align: center; color: #888; padding: 20px;">${__('No available users to transfer to')}</p>`
+				);
+				return;
+			}
+
+			let html = '';
+			for (const user of filteredUsers) {
+				const statusColor = user.status === 'online' ? '#28a745' : (user.status === 'in_call' ? '#ffc107' : '#ccc');
+				const statusText = user.status === 'online' ? 'Online' : (user.status === 'in_call' ? 'In Call' : 'Offline');
+				html += `
+					<div class="f-icecore-user-card transfer-user" data-user="${user.user}" style="cursor: pointer; padding: 10px 12px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 10px; transition: background 0.2s;">
+						<div style="flex-shrink: 0;">
+							${frappe.avatar(user.user, 'avatar-medium')}
+						</div>
+						<div style="flex: 1; min-width: 0;">
+							<div style="font-weight: 600; font-size: 13px;">${user.full_name}</div>
+							<div style="font-size: 11px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${user.user}</div>
+						</div>
+						<div style="flex-shrink: 0; display: flex; align-items: center; gap: 6px;">
+							<span style="width: 8px; height: 8px; border-radius: 50%; background: ${statusColor}; display: inline-block;"></span>
+							<span style="font-size: 11px; color: #888;">${statusText}</span>
+						</div>
+					</div>
+				`;
+			}
+
+			$content.find('#transfer-results').html(html);
+
+			// Click handler: initiate blind transfer
+			$content.find('.transfer-user').on('click', async (e) => {
+				const selectedUser = $(e.currentTarget).data('user');
+				console.log('Transfer: Selected target:', selectedUser);
+
+				$(e.currentTarget).css({ opacity: 0.5, pointerEvents: 'none' });
+				$(e.currentTarget).append(' <i class="fa fa-spinner fa-spin"></i>');
+
+				try {
+					await this._initiateTransfer(callId, selectedUser, 'blind', callType);
+					transferDialog.hide();
+				} catch (err) {
+					console.error('Transfer failed:', err);
+					$(e.currentTarget).css({ opacity: 1, pointerEvents: 'auto' });
+					$(e.currentTarget).find('.fa-spinner').remove();
+					frappe.show_alert({ message: __('Failed to transfer call'), indicator: 'red' }, 5);
+				}
+			});
+
+			// Hover effect
+			$content.find('.transfer-user').hover(
+				function() { $(this).css('background', '#f8f9fa'); },
+				function() { $(this).css('background', ''); }
+			);
+
+		} catch (error) {
+			console.error('Transfer search failed:', error);
+		}
+	}
+
+	/**
+	 * Initiate a call transfer via backend API.
+	 */
+	async _initiateTransfer(callId, transferTarget, transferType, callType) {
+		console.log('Transfer: Initiating', { callId, transferTarget, transferType });
+
+		const response = await frappe.call({
+			method: 'f_icecore.f_icecore.api.call_transfer.initiate_transfer',
+			args: {
+				call_id: callId,
+				transfer_target: transferTarget,
+				transfer_type: transferType
+			}
+		});
+
+		const result = response.message;
+		if (!result.success) {
+			frappe.show_alert({ message: result.message, indicator: 'red' }, 5);
+			return;
+		}
+
+		this._activeTransferId = result.transfer_id;
+
+		if (transferType === 'blind') {
+			// For blind transfer: end our side of the call
+			frappe.show_alert({
+				message: __('Call is being transferred...'),
+				indicator: 'blue'
+			}, 5);
+
+			// End our connection (the other party will be reconnected to the target)
+			this.stopDurationTimer();
+			if (this.currentCallWindow) {
+				this.currentCallWindow.hide();
+				this.currentCallWindow = null;
+			}
+			if (window.FIceCore) {
+				// Stop recording if active
+				if (window.FIceCore.isRecording()) {
+					await window.FIceCore.stopRecording();
+				}
+				await window.FIceCore.endCall();
+			}
+			await this.updatePresence('online');
+		}
+	}
+
+	/**
+	 * Handle incoming transfer notification (you are the transfer target).
+	 * Shows a dialog similar to incoming call, but with transfer context.
+	 */
+	handleTransferIncoming(data) {
+		console.log('Transfer: Incoming transfer:', data);
+
+		const { transfer_id, from_user, from_user_name, transferred_by_name, call_type } = data;
+		const callTypeIcon = call_type === 'video' ? 'video-camera' : 'phone';
+		const callTypeText = call_type === 'video' ? 'Video' : 'Audio';
+
+		// Play ringtone
+		this.playRingtone();
+
+		// Desktop notification
+		this.showDesktopNotification(from_user_name, `${callTypeText} Transfer`, false);
+
+		// Close existing incoming dialog
+		if (this.incomingCallDialog) {
+			this.incomingCallDialog.hide();
+		}
+
+		this.incomingCallDialog = new frappe.ui.Dialog({
+			title: `<i class="fa fa-exchange"></i> ${__('Incoming Call Transfer')}`,
+			static: true,
+			minimizable: false,
+			fields: [
+				{
+					fieldtype: 'HTML',
+					fieldname: 'transfer_incoming_content'
+				}
+			]
+		});
+
+		this.incomingCallDialog.show();
+
+		setTimeout(() => {
+			const $content = this.incomingCallDialog.fields_dict.transfer_incoming_content.$wrapper;
+			$content.html(`
+				<div style="text-align: center; padding: 30px;">
+					<div style="margin-bottom: 20px; display: flex; justify-content: center;">
+						${frappe.avatar(from_user, 'avatar-large')}
+					</div>
+					<h3 style="margin-bottom: 10px;">${from_user_name}</h3>
+					<p style="color: #888; margin-bottom: 10px; font-size: 14px;">
+						<i class="fa fa-exchange"></i> ${__('Call transferred by')} ${transferred_by_name}
+					</p>
+					<p style="color: #888; margin-bottom: 25px; font-size: 16px;">
+						<i class="fa fa-${callTypeIcon}"></i> ${callTypeText} ${__('Call')}
+					</p>
+					<div style="display: flex; justify-content: center; gap: 20px;">
+						<button class="btn btn-success btn-lg" id="f-icecore-transfer-accept-btn">
+							<i class="fa fa-phone"></i> ${__('Accept')}
+						</button>
+						<button class="btn btn-danger btn-lg" id="f-icecore-transfer-decline-btn">
+							<i class="fa fa-phone-slash"></i> ${__('Decline')}
+						</button>
+					</div>
+				</div>
+			`);
+
+			$content.find('#f-icecore-transfer-accept-btn').on('click', () => {
+				this._acceptTransfer(transfer_id, data);
+			});
+			$content.find('#f-icecore-transfer-decline-btn').on('click', () => {
+				this._rejectTransfer(transfer_id);
+			});
+		}, 50);
+
+		window.focus();
+	}
+
+	/**
+	 * Accept an incoming transfer.
+	 */
+	async _acceptTransfer(transferId, data) {
+		try {
+			console.log('Transfer: Accepting transfer:', transferId);
+
+			if (this.incomingCallDialog) {
+				this.incomingCallDialog.hide();
+				this.incomingCallDialog = null;
+			}
+			this.stopRingtone();
+
+			// Accept transfer in backend — creates new call session
+			const response = await frappe.call({
+				method: 'f_icecore.f_icecore.api.call_transfer.accept_transfer',
+				args: { transfer_id: transferId }
+			});
+
+			const result = response.message;
+			if (!result.success) {
+				frappe.show_alert({ message: __('Failed to accept transfer'), indicator: 'red' }, 5);
+				return;
+			}
+
+			const { new_call_id, remaining_user, remaining_user_name, call_type } = result;
+
+			// Request media permission
+			if (window.FIceCore) {
+				await window.FIceCore.requestMediaPermission(call_type);
+			}
+
+			// Show call window with the remaining user
+			this.showCallWindow(remaining_user, call_type, new_call_id, false);
+
+			// Start WebRTC connection — we answer the call (remaining user will send offer)
+			if (window.FIceCore) {
+				await window.FIceCore.answerCall(remaining_user, call_type, new_call_id);
+			}
+
+			await this.updatePresence('in_call', { call_id: new_call_id });
+
+			frappe.show_alert({
+				message: `${__('Connected with')} ${remaining_user_name}`,
+				indicator: 'green'
+			}, 3);
+
+		} catch (error) {
+			console.error('Transfer: Failed to accept:', error);
+			frappe.msgprint(__('Failed to accept transferred call'));
+		}
+	}
+
+	/**
+	 * Reject an incoming transfer.
+	 */
+	async _rejectTransfer(transferId) {
+		try {
+			if (this.incomingCallDialog) {
+				this.incomingCallDialog.hide();
+				this.incomingCallDialog = null;
+			}
+			this.stopRingtone();
+
+			await frappe.call({
+				method: 'f_icecore.f_icecore.api.call_transfer.reject_transfer',
+				args: { transfer_id: transferId }
+			});
+
+		} catch (error) {
+			console.error('Transfer: Failed to reject:', error);
+		}
+	}
+
+	/**
+	 * Handle transfer notification (you are the remaining party being transferred).
+	 * Shows an alert that the call is being transferred.
+	 */
+	handleTransferNotify(data) {
+		console.log('Transfer: Notify — call is being transferred:', data);
+
+		const { transfer_target_name, transfer_type, message: msg } = data;
+
+		if (msg) {
+			frappe.show_alert({
+				message: msg,
+				indicator: 'blue'
+			}, 8);
+		} else {
+			frappe.show_alert({
+				message: `${__('Call is being transferred to')} ${transfer_target_name}...`,
+				indicator: 'blue'
+			}, 8);
+		}
+	}
+
+	/**
+	 * Handle transfer completed — reconnect to the new peer.
+	 * The remaining party (B) needs to establish a new WebRTC connection with the target (C).
+	 */
+	async handleTransferCompleted(data) {
+		console.log('Transfer: Completed:', data);
+
+		const { new_call_id, new_peer, new_peer_name, call_type, old_call_id } = data;
+
+		if (!new_peer || !new_call_id) {
+			// This is just a status notification to the original transferrer
+			if (data.status === 'completed') {
+				frappe.show_alert({
+					message: __('Transfer completed successfully'),
+					indicator: 'green'
+				}, 5);
+			}
+			return;
+		}
+
+		// We are the remaining party — need to reconnect to the new peer
+		console.log('Transfer: Reconnecting to new peer:', new_peer);
+
+		// End the old connection cleanly (without notifying backend — it's already ended)
+		if (window.FIceCore) {
+			if (window.FIceCore.peerConnection) {
+				window.FIceCore.peerConnection.close();
+				window.FIceCore.peerConnection = null;
+			}
+			if (window.FIceCore.localStream) {
+				window.FIceCore.localStream.getTracks().forEach(t => t.stop());
+				window.FIceCore.localStream = null;
+			}
+			window.FIceCore.remoteStream = null;
+			window.FIceCore.callId = null;
+			window.FIceCore.remoteUser = null;
+		}
+
+		// Remove hidden audio element
+		const remoteAudio = document.getElementById('remote-audio');
+		if (remoteAudio) {
+			remoteAudio.srcObject = null;
+			remoteAudio.remove();
+		}
+
+		this.stopDurationTimer();
+
+		// Close old call window
+		if (this.currentCallWindow) {
+			this.currentCallWindow.hide();
+			this.currentCallWindow = null;
+		}
+
+		frappe.show_alert({
+			message: `${__('Transferred. Connecting to')} ${new_peer_name}...`,
+			indicator: 'green'
+		}, 5);
+
+		// Show new call window and start a new WebRTC call to the transfer target
+		this.showCallWindow(new_peer, call_type || 'audio', new_call_id, true);
+
+		if (window.FIceCore) {
+			await window.FIceCore.startCall(new_peer, call_type || 'audio', new_call_id);
+		}
+
+		await this.updatePresence('in_call', { call_id: new_call_id });
+	}
+
+	/**
+	 * Handle transfer failed notification.
+	 */
+	handleTransferFailed(data) {
+		console.log('Transfer: Failed:', data);
+
+		frappe.show_alert({
+			message: data.reason || __('Transfer failed'),
+			indicator: 'red'
+		}, 5);
+
+		this._activeTransferId = null;
+	}
+
+	/**
+	 * Handle transfer cancelled notification.
+	 */
+	handleTransferCancelled(data) {
+		console.log('Transfer: Cancelled:', data);
+
+		// Close incoming transfer dialog if open
+		if (this.incomingCallDialog) {
+			this.incomingCallDialog.hide();
+			this.incomingCallDialog = null;
+		}
+		this.stopRingtone();
+
+		frappe.show_alert({
+			message: data.message || __('Transfer was cancelled'),
+			indicator: 'orange'
+		}, 5);
+
+		this._activeTransferId = null;
+	}
+
+	// ============================================================
+	// Floating Widget — Minimize / Restore Call Window
+	// ============================================================
+
+	/**
+	 * Minimize the call window to a small floating widget.
+	 * @param {string} remoteUser - The remote user email or display name
+	 * @param {string} callType - 'audio', 'video', 'screen'
+	 * @param {string} callId - The call/group call ID
+	 * @param {boolean} isGroup - Whether this is a group call
+	 */
+	/**
+	 * Programmatic minimize — hides dialog and creates widget.
+	 * Used when calling _minimizeToWidget directly (not via on_hide).
+	 */
+	_minimizeToWidget(remoteUser, callType, callId, isGroup) {
+		if (this._isMinimized) return; // Already minimized
+
+		this._isMinimized = true;
+		this._minimizedCallContext = { remoteUser, callType, callId, isGroup };
+
+		// Hide the dialog — temporarily remove on_hide to prevent double widget creation
+		if (this.currentCallWindow) {
+			const origOnHide = this.currentCallWindow.on_hide;
+			this.currentCallWindow.on_hide = null;
+			this.currentCallWindow.hide();
+			setTimeout(() => {
+				if (this.currentCallWindow) {
+					this.currentCallWindow.on_hide = origOnHide;
+				}
+				$('body').removeClass('modal-open').css('overflow', '');
+				$('.modal-backdrop').remove();
+			}, 300);
+		}
+
+		this._createFloatingWidget(remoteUser, callType, callId, isGroup);
+	}
+
+	/**
+	 * Create the floating widget UI (called by on_hide or _minimizeToWidget).
+	 */
+	_createFloatingWidget(remoteUser, callType, callId, isGroup) {
+		console.log('🔽 Creating floating call widget:', { remoteUser, callType, callId, isGroup });
+
+		// Remove existing widget if any
+		const existingWidget = document.getElementById('f-icecore-floating-widget');
+		if (existingWidget) existingWidget.remove();
+
+		// Determine display name
+		let displayName = remoteUser;
+		if (!isGroup && remoteUser) {
+			displayName = frappe.boot.user_info[remoteUser]?.fullname || remoteUser;
+		}
+
+		// Get avatar user for display
+		const avatarUser = isGroup ? null : remoteUser;
+
+		// Build widget HTML
+		const callTypeIcon = callType === 'video' ? 'video-camera' : 'phone';
+		const callTypeLabel = isGroup ? __('Group Call') : (callType === 'video' ? __('Video Call') : __('Audio Call'));
+		const avatarHtml = avatarUser
+			? frappe.avatar(avatarUser, 'avatar-small')
+			: `<div style="width:36px; height:36px; border-radius:50%; background:#5865f2; display:flex; align-items:center; justify-content:center; color:white; font-size:14px;"><i class="fa fa-users"></i></div>`;
+
+		const widgetEl = document.createElement('div');
+		widgetEl.className = 'f-icecore-floating-widget';
+		widgetEl.id = 'f-icecore-floating-widget';
+		widgetEl.innerHTML = `
+			<div class="widget-call-pulse"></div>
+			<div class="widget-header" id="f-ic-widget-drag-handle">
+				<div class="widget-avatar">${avatarHtml}</div>
+				<div class="widget-info">
+					<div class="widget-user-name">${displayName}</div>
+					<div class="widget-call-info">
+						<i class="fa fa-${callTypeIcon}" style="font-size: 11px;"></i>
+						<span>${callTypeLabel}</span>
+						<span class="widget-duration" id="f-ic-widget-duration">00:00</span>
+					</div>
+				</div>
+			</div>
+			<div class="widget-controls">
+				<button class="widget-btn btn-expand" id="f-ic-widget-expand" title="${__('Restore call window')}">
+					<i class="fa fa-expand"></i>
+				</button>
+				<button class="widget-btn btn-mute ${this.isAudioMuted ? 'muted' : ''}" id="f-ic-widget-mute" title="${__('Toggle mute')}">
+					<i class="fa fa-${this.isAudioMuted ? 'microphone-slash' : 'microphone'}"></i>
+				</button>
+				<button class="widget-btn btn-hangup" id="f-ic-widget-hangup" title="${__('End call')}">
+					<i class="fa fa-phone" style="transform: rotate(135deg);"></i>
+				</button>
+			</div>
+		`;
+
+		document.body.appendChild(widgetEl);
+		this._floatingWidget = widgetEl;
+
+		// Sync duration from existing timer
+		this._syncWidgetDuration();
+
+		// Widget button handlers
+		widgetEl.querySelector('#f-ic-widget-expand').addEventListener('click', (e) => {
+			e.stopPropagation();
+			this._restoreFromWidget();
+		});
+
+		widgetEl.querySelector('#f-ic-widget-mute').addEventListener('click', (e) => {
+			e.stopPropagation();
+			if (isGroup) {
+				this._groupToggleAudio();
+			} else {
+				this.toggleAudio();
+			}
+			// Update mute button state
+			const muteBtn = widgetEl.querySelector('#f-ic-widget-mute');
+			if (muteBtn) {
+				muteBtn.classList.toggle('muted', this.isAudioMuted);
+				muteBtn.innerHTML = `<i class="fa fa-${this.isAudioMuted ? 'microphone-slash' : 'microphone'}"></i>`;
+			}
+		});
+
+		widgetEl.querySelector('#f-ic-widget-hangup').addEventListener('click', (e) => {
+			e.stopPropagation();
+			this._removeFloatingWidget();
+			if (isGroup) {
+				this.hangupGroupCall();
+			} else {
+				this.hangup();
+			}
+		});
+
+		// Double-click header to restore
+		widgetEl.querySelector('.widget-header').addEventListener('dblclick', (e) => {
+			e.stopPropagation();
+			this._restoreFromWidget();
+		});
+
+		// Make widget draggable
+		this._makeWidgetDraggable(widgetEl);
+
+		console.log('✅ Floating widget created');
+	}
+
+	/**
+	 * Sync the widget's duration display with the running call timer.
+	 */
+	_syncWidgetDuration() {
+		// Get current duration from the active timer element
+		const durationEl = document.getElementById('call-duration') || document.getElementById('group-call-duration');
+		if (durationEl) {
+			const currentDuration = durationEl.textContent || '00:00';
+			const widgetDuration = document.getElementById('f-ic-widget-duration');
+			if (widgetDuration) widgetDuration.textContent = currentDuration;
+
+			// Parse current seconds
+			const parts = currentDuration.split(':');
+			this._floatingWidgetDuration = (parseInt(parts[0]) || 0) * 60 + (parseInt(parts[1]) || 0);
+		}
+
+		// Start widget timer
+		if (this._floatingWidgetTimerInterval) {
+			clearInterval(this._floatingWidgetTimerInterval);
+		}
+		this._floatingWidgetTimerInterval = setInterval(() => {
+			this._floatingWidgetDuration++;
+			const widgetDuration = document.getElementById('f-ic-widget-duration');
+			if (widgetDuration) {
+				const minutes = Math.floor(this._floatingWidgetDuration / 60);
+				const secs = this._floatingWidgetDuration % 60;
+				widgetDuration.textContent = `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+			}
+		}, 1000);
+	}
+
+	/**
+	 * Restore the call window from the floating widget.
+	 */
+	_restoreFromWidget() {
+		console.log('🔼 Restoring call window from floating widget');
+
+		const ctx = this._minimizedCallContext;
+		if (!ctx) {
+			console.warn('⚠️ No minimized call context to restore');
+			return;
+		}
+
+		// Stop widget timer
+		if (this._floatingWidgetTimerInterval) {
+			clearInterval(this._floatingWidgetTimerInterval);
+			this._floatingWidgetTimerInterval = null;
+		}
+
+		// Remove the widget (but keep _minimizedCallContext until we successfully restore)
+		if (this._floatingWidgetTimerInterval) {
+			clearInterval(this._floatingWidgetTimerInterval);
+			this._floatingWidgetTimerInterval = null;
+		}
+		if (this._floatingWidget) {
+			this._floatingWidget.style.animation = 'f-ic-widget-slide-out 0.2s ease-in forwards';
+			const widget = this._floatingWidget;
+			setTimeout(() => {
+				if (widget && widget.parentNode) widget.parentNode.removeChild(widget);
+			}, 200);
+			this._floatingWidget = null;
+		}
+		const orphaned = document.getElementById('f-icecore-floating-widget');
+		if (orphaned) orphaned.remove();
+
+		this._isMinimized = false;
+		this._minimizedCallContext = null;
+
+		// Show the dialog again using Frappe's show() which properly manages backdrop + body
+		if (this.currentCallWindow) {
+			this.currentCallWindow.show();
+
+			// Re-attach streams after a short delay (DOM needs to be visible)
+			setTimeout(() => {
+				if (ctx.isGroup && window.FIceCoreGroup?.localStream) {
+					this._groupAttachLocalStream();
+					// Re-attach all remote streams
+					for (const [userId, peerData] of window.FIceCoreGroup.peers) {
+						if (peerData.remoteStream && peerData.remoteStream.getTracks().length > 0) {
+							this._attachGroupRemoteStream(userId, peerData.remoteStream);
+						}
+					}
+				} else if (!ctx.isGroup && window.FIceCore) {
+					window.FIceCore.attachLocalStream();
+					window.FIceCore.attachRemoteStream();
+				}
+			}, 200);
+
+			console.log('✅ Call window restored');
+		} else {
+			console.warn('⚠️ No call window to restore — it was closed');
+		}
+	}
+
+	/**
+	 * Remove the floating widget from the DOM.
+	 */
+	_removeFloatingWidget() {
+		if (this._floatingWidgetTimerInterval) {
+			clearInterval(this._floatingWidgetTimerInterval);
+			this._floatingWidgetTimerInterval = null;
+		}
+
+		if (this._floatingWidget) {
+			// Animate out
+			this._floatingWidget.style.animation = 'f-ic-widget-slide-out 0.2s ease-in forwards';
+			const widget = this._floatingWidget;
+			setTimeout(() => {
+				if (widget && widget.parentNode) {
+					widget.parentNode.removeChild(widget);
+				}
+			}, 200);
+			this._floatingWidget = null;
+		}
+
+		// Also remove by ID in case of orphaned widgets
+		const orphaned = document.getElementById('f-icecore-floating-widget');
+		if (orphaned) {
+			orphaned.remove();
+		}
+
+		this._isMinimized = false;
+		this._minimizedCallContext = null;
+	}
+
+	/**
+	 * Make the floating widget draggable.
+	 */
+	_makeWidgetDraggable(widgetEl) {
+		const handle = widgetEl.querySelector('#f-ic-widget-drag-handle');
+		if (!handle) return;
+
+		let isDragging = false;
+		let startX, startY, startLeft, startBottom;
+
+		const onMouseDown = (e) => {
+			// Ignore clicks on buttons
+			if (e.target.closest('.widget-controls') || e.target.closest('.widget-btn')) return;
+
+			isDragging = true;
+			const rect = widgetEl.getBoundingClientRect();
+			startX = e.clientX || (e.touches && e.touches[0].clientX);
+			startY = e.clientY || (e.touches && e.touches[0].clientY);
+			startLeft = rect.left;
+			startBottom = window.innerHeight - rect.bottom;
+
+			widgetEl.style.transition = 'none';
+			e.preventDefault();
+		};
+
+		const onMouseMove = (e) => {
+			if (!isDragging) return;
+
+			const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+			const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+
+			const deltaX = clientX - startX;
+			const deltaY = clientY - startY;
+
+			const newLeft = startLeft + deltaX;
+			const newBottom = startBottom - deltaY;
+
+			// Clamp to viewport
+			const maxLeft = window.innerWidth - widgetEl.offsetWidth - 8;
+			const maxBottom = window.innerHeight - widgetEl.offsetHeight - 8;
+
+			widgetEl.style.left = Math.max(8, Math.min(newLeft, maxLeft)) + 'px';
+			widgetEl.style.bottom = Math.max(8, Math.min(newBottom, maxBottom)) + 'px';
+			widgetEl.style.right = 'auto';
+		};
+
+		const onMouseUp = () => {
+			if (isDragging) {
+				isDragging = false;
+				widgetEl.style.transition = '';
+			}
+		};
+
+		// Mouse events
+		handle.addEventListener('mousedown', onMouseDown);
+		document.addEventListener('mousemove', onMouseMove);
+		document.addEventListener('mouseup', onMouseUp);
+
+		// Touch events (mobile)
+		handle.addEventListener('touchstart', onMouseDown, { passive: false });
+		document.addEventListener('touchmove', onMouseMove, { passive: false });
+		document.addEventListener('touchend', onMouseUp);
+	}
+
+	/**
+	 * Check if the call is currently minimized to a widget.
+	 * @returns {boolean}
+	 */
+	isCallMinimized() {
+		return this._isMinimized && this._floatingWidget !== null;
+	}
+
+	// ============================================================
+	// Noise Cancellation UI
+	// ============================================================
+
+	/**
+	 * Toggle noise cancellation on/off for the active call.
+	 */
+	async toggleNoiseCancellation() {
+		if (!window.FIceCoreNoiseCancel) {
+			console.warn('🔇 Noise cancellation engine not available');
+			frappe.show_alert({
+				message: __('Noise cancellation is not available'),
+				indicator: 'orange'
+			}, 3);
+			return;
+		}
+
+		const btn = document.getElementById('toggle-noise-cancel-btn') || document.getElementById('group-toggle-noise-cancel-btn');
+		if (btn) btn.disabled = true;
+
+		try {
+			if (this._noiseCancelEnabled) {
+				// Disable — revert to original audio stream
+				await this._disableNoiseCancellation();
+				this._updateNoiseCancelButton(false);
+				frappe.show_alert({
+					message: __('Noise cancellation disabled'),
+					indicator: 'blue'
+				}, 3);
+			} else {
+				// Enable — process audio through noise cancellation pipeline
+				const success = await this._enableNoiseCancellation();
+				if (success) {
+					this._updateNoiseCancelButton(true);
+					frappe.show_alert({
+						message: __('Noise cancellation enabled'),
+						indicator: 'green'
+					}, 3);
+				} else {
+					frappe.show_alert({
+						message: __('Failed to enable noise cancellation'),
+						indicator: 'red'
+					}, 3);
+				}
+			}
+		} catch (error) {
+			console.error('🔇 Noise cancellation toggle error:', error);
+		} finally {
+			if (btn) btn.disabled = false;
+		}
+	}
+
+	/**
+	 * Enable noise cancellation on the active local stream.
+	 */
+	async _enableNoiseCancellation() {
+		try {
+			// Determine which engine has the active local stream
+			const isGroup = window.FIceCoreGroup?.isInGroupCall;
+			const localStream = isGroup
+				? window.FIceCoreGroup?.localStream
+				: window.FIceCore?.localStream;
+
+			if (!localStream) {
+				console.warn('🔇 No local stream to process');
+				return false;
+			}
+
+			// Store original audio track for restoration
+			this._originalAudioTrack = localStream.getAudioTracks()[0];
+			if (!this._originalAudioTrack) {
+				console.warn('🔇 No audio track in local stream');
+				return false;
+			}
+
+			// Process through noise cancellation
+			const processedStream = await window.FIceCoreNoiseCancel.processStream(localStream);
+			if (!processedStream) return false;
+
+			const processedAudioTrack = processedStream.getAudioTracks()[0];
+			if (!processedAudioTrack) return false;
+
+			// Replace audio track on all peer connections
+			if (isGroup && window.FIceCoreGroup) {
+				// Replace on all peer connections in group call
+				for (const [userId, peerData] of window.FIceCoreGroup.peers) {
+					const senders = peerData.peerConnection?.getSenders();
+					if (senders) {
+						const audioSender = senders.find(s => s.track?.kind === 'audio');
+						if (audioSender) {
+							await audioSender.replaceTrack(processedAudioTrack);
+						}
+					}
+				}
+				// Update local stream reference
+				window.FIceCoreGroup.localStream = processedStream;
+			} else if (window.FIceCore?.peerConnection) {
+				// Replace on 1:1 peer connection
+				const senders = window.FIceCore.peerConnection.getSenders();
+				const audioSender = senders.find(s => s.track?.kind === 'audio');
+				if (audioSender) {
+					await audioSender.replaceTrack(processedAudioTrack);
+				}
+				// Update local stream reference
+				window.FIceCore.localStream = processedStream;
+			}
+
+			this._noiseCancelEnabled = true;
+			console.log('🔇 Noise cancellation enabled on active call');
+			return true;
+
+		} catch (error) {
+			console.error('🔇 Failed to enable noise cancellation:', error);
+			return false;
+		}
+	}
+
+	/**
+	 * Disable noise cancellation and revert to original audio.
+	 */
+	async _disableNoiseCancellation() {
+		try {
+			if (!this._originalAudioTrack || !window.FIceCoreNoiseCancel) {
+				this._noiseCancelEnabled = false;
+				return;
+			}
+
+			// Disable the noise cancellation pipeline (sets bypass mode)
+			window.FIceCoreNoiseCancel.disable();
+
+			this._noiseCancelEnabled = false;
+			console.log('🔇 Noise cancellation disabled');
+
+		} catch (error) {
+			console.error('🔇 Failed to disable noise cancellation:', error);
+			this._noiseCancelEnabled = false;
+		}
+	}
+
+	/**
+	 * Completely destroy the noise cancellation pipeline (on call end).
+	 */
+	_destroyNoiseCancellation() {
+		if (window.FIceCoreNoiseCancel) {
+			window.FIceCoreNoiseCancel.destroy();
+			// Recreate a fresh instance for the next call
+			window.FIceCoreNoiseCancel = new FIceCoreNoiseCancellation();
+		}
+		this._noiseCancelEnabled = false;
+		this._originalAudioTrack = null;
+	}
+
+	/**
+	 * Update the noise cancellation button appearance.
+	 */
+	_updateNoiseCancelButton(isEnabled) {
+		// Update both 1:1 and group buttons
+		const btns = [
+			document.getElementById('toggle-noise-cancel-btn'),
+			document.getElementById('group-toggle-noise-cancel-btn')
+		];
+
+		for (const btn of btns) {
+			if (!btn) continue;
+
+			if (isEnabled) {
+				btn.className = 'btn btn-success btn-lg';
+				btn.innerHTML = '<i class="fa fa-assistive-listening-systems"></i> ' + __('NC On');
+				btn.title = __('Noise cancellation is active — click to disable');
+			} else {
+				btn.className = 'btn btn-secondary btn-lg';
+				btn.innerHTML = '<i class="fa fa-assistive-listening-systems"></i> ' + __('Noise Cancel');
+				btn.title = __('Toggle AI noise cancellation');
+			}
 		}
 	}
 }
