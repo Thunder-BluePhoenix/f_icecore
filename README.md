@@ -627,7 +627,7 @@ f_icecore/
 - [ ] End-to-end encryption
 - [ ] Mobile app support
 - [ ] Virtual backgrounds
-- [ ] Noise cancellation
+- [x] Noise cancellation
 
 ---
 

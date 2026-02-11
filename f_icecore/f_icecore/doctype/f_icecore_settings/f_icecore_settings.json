@@ -30,6 +30,8 @@
   "enable_call_recording",
   "enable_call_transfer",
   "cleanup_old_recordings",
+  "enable_noise_cancellation",
+  "noise_cancellation_level",
   "advanced_section",
   "custom_ringtone",
   "custom_calling_tone",
@@ -202,6 +204,21 @@
    "fieldtype": "Int",
    "label": "Cleanup Old Recordings (days)",
    "description": "Automatically delete call recordings older than this many days (0 = never delete)"
+  },
+  {
+   "default": "1",
+   "fieldname": "enable_noise_cancellation",
+   "fieldtype": "Check",
+   "label": "Enable Noise Cancellation",
+   "description": "Allow users to enable AI-powered noise cancellation during calls (removes background noise, keyboard typing, etc.)"
+  },
+  {
+   "default": "medium",
+   "fieldname": "noise_cancellation_level",
+   "fieldtype": "Select",
+   "label": "Noise Cancellation Level",
+   "options": "low\nmedium\naggressive",
+   "description": "Default noise cancellation level. Low: gentle filtering. Medium: balanced. Aggressive: maximum noise removal (may affect voice quality)."
   },
   {
    "collapsible": 1,
