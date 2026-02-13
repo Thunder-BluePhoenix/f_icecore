@@ -1648,9 +1648,19 @@ class FIceCoreWebRTC {
 				if (response.message?.success) {
 					this._recordingId = response.message.recording_id;
 					console.log('Recording: Backend recording ID:', this._recordingId);
+				} else {
+					console.warn('Recording: Backend rejected recording start:', response.message?.message);
+					frappe.show_alert({
+						message: response.message?.message || __('Recording will be saved locally only'),
+						indicator: 'orange'
+					}, 5);
 				}
 			} catch (e) {
 				console.warn('Recording: Failed to create backend record:', e);
+				frappe.show_alert({
+					message: __('Recording started — will be saved as download'),
+					indicator: 'orange'
+				}, 3);
 			}
 
 			console.log('Recording: Call recording started successfully');
@@ -1717,17 +1727,23 @@ class FIceCoreWebRTC {
 
 			console.log('Recording: Created blob, size:', blob.size, 'bytes');
 
+			// Always download a local copy for the user
+			this._downloadRecording(blob);
+
 			if (!this._recordingId) {
-				// No backend record — just offer download
-				this._downloadRecording(blob);
+				// No backend record — download only (already done above)
+				console.log('Recording: No backend recording ID, saved as download only');
+				this._recordedChunks = [];
 				return;
 			}
 
-			// Convert blob to base64 and upload
+			// Upload to backend and attach to Call Recording doctype
 			const reader = new FileReader();
 			reader.onload = async () => {
 				try {
 					const base64 = reader.result.split(',')[1]; // Remove data URL prefix
+
+					console.log('Recording: Uploading to backend...', this._recordingId);
 
 					const response = await frappe.call({
 						method: 'f_icecore.f_icecore.api.call_recording.save_recording_blob',
@@ -1740,15 +1756,26 @@ class FIceCoreWebRTC {
 					if (response.message?.success) {
 						console.log('Recording: File uploaded successfully:', response.message.file_url);
 						frappe.show_alert({
-							message: __('Call recording saved successfully'),
+							message: __('Call recording saved to system'),
 							indicator: 'green'
+						}, 5);
+					} else {
+						console.warn('Recording: Backend save returned failure');
+						frappe.show_alert({
+							message: __('Recording downloaded but failed to save to system'),
+							indicator: 'orange'
 						}, 5);
 					}
 				} catch (e) {
-					console.error('Recording: Failed to upload recording:', e);
-					// Fallback: offer download
-					this._downloadRecording(blob);
+					console.error('Recording: Failed to upload recording to backend:', e);
+					frappe.show_alert({
+						message: __('Recording downloaded but upload to system failed'),
+						indicator: 'orange'
+					}, 5);
 				}
+			};
+			reader.onerror = () => {
+				console.error('Recording: Failed to read blob as base64');
 			};
 			reader.readAsDataURL(blob);
 

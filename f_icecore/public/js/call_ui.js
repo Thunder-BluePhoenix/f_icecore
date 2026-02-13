@@ -833,7 +833,10 @@ class FIceCoreCallUI {
 			const $content = this.currentCallWindow.fields_dict.call_window_content.$wrapper;
 
 			let contentHtml = `
-				<div class="f-icecore-call-window" style="padding: 20px;">
+				<div class="f-icecore-call-window" style="padding: 20px; position: relative;">
+					<button class="call-minimize-top-right" id="minimize-call-btn" data-tooltip="${__('Minimize')}">
+						<i class="fa fa-window-minimize" style="font-size: 12px;"></i>
+					</button>
 			`;
 
 			if (hasVideo) {
@@ -882,42 +885,52 @@ class FIceCoreCallUI {
 			}
 
 			contentHtml += `
-					<div class="call-controls" style="text-align: center; margin-top: 30px; display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
-						<button class="btn btn-secondary btn-lg" id="toggle-audio-btn">
-							<i class="fa fa-microphone"></i> ${__('Mute')}
-						</button>
+					<div class="call-controls">
+						<div class="call-controls-primary">
+							<button class="call-ctrl-btn" id="toggle-audio-btn" data-tooltip="${__('Mute')}">
+								<i class="fa fa-microphone"></i>
+							</button>
 			`;
 
 			if (hasVideo) {
 				contentHtml += `
-						<button class="btn btn-secondary btn-lg" id="toggle-video-btn">
-							<i class="fa fa-video-camera"></i> ${__('Stop Video')}
-						</button>
+							<button class="call-ctrl-btn" id="toggle-video-btn" data-tooltip="${__('Stop Video')}">
+								<i class="fa fa-video-camera"></i>
+							</button>
 				`;
 			}
 
 			contentHtml += `
-						<button class="btn btn-info btn-lg" id="toggle-screen-share-btn" title="${__('Share your screen during this call')}">
-							<i class="fa fa-desktop"></i> ${__('Share Screen')}
-						</button>
-						<button class="btn btn-secondary btn-lg" id="toggle-noise-cancel-btn" title="${__('Toggle AI noise cancellation')}">
-							<i class="fa fa-assistive-listening-systems"></i> ${__('Noise Cancel')}
-						</button>
-						<button class="btn btn-secondary btn-lg" id="toggle-record-btn" title="${__('Record this call')}">
-							<i class="fa fa-circle" style="color: #dc3545;"></i> ${__('Record')}
-						</button>
-						<button class="btn btn-secondary btn-lg" id="transfer-call-btn" title="${__('Transfer this call to another user')}">
-							<i class="fa fa-exchange"></i> ${__('Transfer')}
-						</button>
-						<button class="btn btn-primary btn-lg" id="add-participant-btn" title="${__('Add another person to this call')}">
-							<i class="fa fa-user-plus"></i> ${__('Add')}
-						</button>
-						<button class="btn btn-secondary btn-lg" id="minimize-call-btn" title="${__('Minimize call to floating widget')}">
-							<i class="fa fa-window-minimize"></i> ${__('Minimize')}
-						</button>
-						<button class="btn btn-danger btn-lg" id="f-icecore-hangup-btn">
-							<i class="fa fa-phone" style="transform: rotate(135deg);"></i> ${__('End Call')}
-						</button>
+							<button class="call-ctrl-btn btn-info-ctrl" id="toggle-screen-share-btn" data-tooltip="${__('Share Screen')}">
+								<i class="fa fa-desktop"></i>
+							</button>
+							<div class="call-more-wrapper">
+								<button class="call-ctrl-btn" id="more-options-btn" data-tooltip="${__('More')}">
+									<i class="fa fa-ellipsis-v"></i>
+								</button>
+								<div class="call-more-menu" id="more-options-menu">
+									<div class="call-more-item" id="toggle-noise-cancel-btn">
+										<i class="fa fa-assistive-listening-systems"></i>
+										<span>${__('Noise Cancel')}</span>
+									</div>
+									<div class="call-more-item" id="toggle-record-btn">
+										<i class="fa fa-circle" style="color: #dc3545;"></i>
+										<span>${__('Record')}</span>
+									</div>
+									<div class="call-more-item" id="transfer-call-btn">
+										<i class="fa fa-exchange"></i>
+										<span>${__('Transfer')}</span>
+									</div>
+									<div class="call-more-item" id="add-participant-btn">
+										<i class="fa fa-user-plus"></i>
+										<span>${__('Add Participant')}</span>
+									</div>
+								</div>
+							</div>
+							<button class="call-ctrl-btn btn-hangup" id="f-icecore-hangup-btn" data-tooltip="${__('End Call')}">
+								<i class="fa fa-phone" style="transform: rotate(135deg);"></i>
+							</button>
+						</div>
 					</div>
 				</div>
 			`;
@@ -925,6 +938,7 @@ class FIceCoreCallUI {
 			$content.html(contentHtml);
 
 			// Attach click handlers via jQuery (no inline onclick)
+			// -- Primary buttons --
 			$content.find('#toggle-audio-btn').on('click', () => {
 				window.FIceCoreUI.toggleAudio();
 			});
@@ -936,6 +950,31 @@ class FIceCoreCallUI {
 			$content.find('#toggle-screen-share-btn').on('click', () => {
 				window.FIceCoreUI.toggleScreenShare();
 			});
+			$content.find('#f-icecore-hangup-btn').on('click', () => {
+				window.FIceCoreUI.hangup();
+			});
+
+			// -- Minimize (top-right) --
+			$content.find('#minimize-call-btn').on('click', () => {
+				if (window.FIceCoreUI.currentCallWindow) {
+					window.FIceCoreUI.currentCallWindow.hide();
+				}
+			});
+
+			// -- More menu toggle --
+			$content.find('#more-options-btn').on('click', (e) => {
+				e.stopPropagation();
+				$content.find('#more-options-menu').toggleClass('open');
+			});
+
+			// Close more menu on click outside
+			$(document).on('click.f-icecore-more-menu', (e) => {
+				if (!$(e.target).closest('.call-more-wrapper').length) {
+					$content.find('#more-options-menu').removeClass('open');
+				}
+			});
+
+			// -- More menu items --
 			$content.find('#toggle-noise-cancel-btn').on('click', () => {
 				window.FIceCoreUI.toggleNoiseCancellation();
 			});
@@ -943,19 +982,12 @@ class FIceCoreCallUI {
 				window.FIceCoreUI.toggleRecording();
 			});
 			$content.find('#transfer-call-btn').on('click', () => {
+				$content.find('#more-options-menu').removeClass('open');
 				window.FIceCoreUI.showTransferDialog(callId, remoteUser, callType);
 			});
-			$content.find('#f-icecore-hangup-btn').on('click', () => {
-				window.FIceCoreUI.hangup();
-			});
 			$content.find('#add-participant-btn').on('click', () => {
+				$content.find('#more-options-menu').removeClass('open');
 				window.FIceCoreUI.showAddParticipantDialog(callId, remoteUser, callType);
-			});
-			$content.find('#minimize-call-btn').on('click', () => {
-				// Just hide the dialog — on_hide will create the floating widget
-				if (window.FIceCoreUI.currentCallWindow) {
-					window.FIceCoreUI.currentCallWindow.hide();
-				}
 			});
 
 			// Store current 1:1 call context for add-participant
@@ -1093,6 +1125,9 @@ class FIceCoreCallUI {
 			this.stopCallingTone();
 			this.stopDurationTimer();
 
+			// Clean up document click handlers for more menu
+			$(document).off('click.f-icecore-more-menu');
+
 			// Remove floating widget if minimized
 			this._removeFloatingWidget();
 
@@ -1130,6 +1165,9 @@ class FIceCoreCallUI {
 		this.stopRingtone();
 		this.stopCallingTone();
 		this.stopDurationTimer();
+
+		// Clean up document click handlers for more menu
+		$(document).off('click.f-icecore-more-menu');
 
 		// Remove floating widget if minimized
 		this._removeFloatingWidget();
@@ -1200,8 +1238,10 @@ class FIceCoreCallUI {
 			const btn = document.getElementById('toggle-audio-btn');
 			if (btn) {
 				btn.innerHTML = this.isAudioMuted ?
-					'<i class="fa fa-microphone-slash"></i> Unmute' :
-					'<i class="fa fa-microphone"></i> Mute';
+					'<i class="fa fa-microphone-slash"></i>' :
+					'<i class="fa fa-microphone"></i>';
+				btn.setAttribute('data-tooltip', this.isAudioMuted ? __('Unmute') : __('Mute'));
+				btn.classList.toggle('active-muted', this.isAudioMuted);
 			}
 
 			console.log('🎤 Audio', this.isAudioMuted ? 'muted' : 'unmuted');
@@ -1221,9 +1261,9 @@ class FIceCoreCallUI {
 
 			const btn = document.getElementById('toggle-video-btn');
 			if (btn) {
-				btn.innerHTML = this.isVideoMuted ?
-					'<i class="fa fa-video-camera"></i> Start Video' :
-					'<i class="fa fa-video-camera"></i> Stop Video';
+				btn.innerHTML = '<i class="fa fa-video-camera"></i>';
+				btn.setAttribute('data-tooltip', this.isVideoMuted ? __('Start Video') : __('Stop Video'));
+				btn.classList.toggle('active-off', this.isVideoMuted);
 			}
 
 			console.log('📹 Video', this.isVideoMuted ? 'stopped' : 'started');
@@ -1279,13 +1319,13 @@ class FIceCoreCallUI {
 		if (!btn) return;
 
 		if (isSharing) {
-			btn.className = 'btn btn-warning btn-lg';
-			btn.innerHTML = '<i class="fa fa-desktop"></i> ' + __('Stop Sharing');
-			btn.title = __('Stop sharing your screen');
+			btn.className = 'call-ctrl-btn active-sharing';
+			btn.innerHTML = '<i class="fa fa-desktop"></i>';
+			btn.setAttribute('data-tooltip', __('Stop Sharing'));
 		} else {
-			btn.className = 'btn btn-info btn-lg';
-			btn.innerHTML = '<i class="fa fa-desktop"></i> ' + __('Share Screen');
-			btn.title = __('Share your screen during this call');
+			btn.className = 'call-ctrl-btn btn-info-ctrl';
+			btn.innerHTML = '<i class="fa fa-desktop"></i>';
+			btn.setAttribute('data-tooltip', __('Share Screen'));
 		}
 	}
 
@@ -1339,13 +1379,13 @@ class FIceCoreCallUI {
 		if (!btn) return;
 
 		if (isSharing) {
-			btn.className = 'btn btn-warning btn-lg';
-			btn.innerHTML = '<i class="fa fa-desktop"></i> ' + __('Stop Sharing');
-			btn.title = __('Stop sharing your screen');
+			btn.className = 'call-ctrl-btn active-sharing';
+			btn.innerHTML = '<i class="fa fa-desktop"></i>';
+			btn.setAttribute('data-tooltip', __('Stop Sharing'));
 		} else {
-			btn.className = 'btn btn-info btn-lg';
-			btn.innerHTML = '<i class="fa fa-desktop"></i> ' + __('Share Screen');
-			btn.title = __('Share your screen during this call');
+			btn.className = 'call-ctrl-btn btn-info-ctrl';
+			btn.innerHTML = '<i class="fa fa-desktop"></i>';
+			btn.setAttribute('data-tooltip', __('Share Screen'));
 		}
 	}
 
@@ -1854,7 +1894,10 @@ class FIceCoreCallUI {
 			}
 
 			let contentHtml = `
-				<div class="f-icecore-group-call-window" style="padding: 15px;">
+				<div class="f-icecore-group-call-window" style="padding: 15px; position: relative;">
+					<button class="call-minimize-top-right" id="group-minimize-call-btn" data-tooltip="${__('Minimize')}">
+						<i class="fa fa-window-minimize" style="font-size: 12px;"></i>
+					</button>
 					<div class="f-ic-group-video-grid ${gridClass}" id="group-video-grid">
 						${tilesHtml}
 					</div>
@@ -1872,36 +1915,44 @@ class FIceCoreCallUI {
 					</div>
 
 					<!-- Controls -->
-					<div class="call-controls" style="text-align: center; margin-top: 20px; display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
-						<button class="btn btn-secondary btn-lg" id="group-toggle-audio-btn">
-							<i class="fa fa-microphone"></i> ${__('Mute')}
-						</button>
+					<div class="call-controls">
+						<div class="call-controls-primary">
+							<button class="call-ctrl-btn" id="group-toggle-audio-btn" data-tooltip="${__('Mute')}">
+								<i class="fa fa-microphone"></i>
+							</button>
 			`;
 
 			if (hasVideo) {
 				contentHtml += `
-						<button class="btn btn-secondary btn-lg" id="group-toggle-video-btn">
-							<i class="fa fa-video-camera"></i> ${__('Stop Video')}
-						</button>
+							<button class="call-ctrl-btn" id="group-toggle-video-btn" data-tooltip="${__('Stop Video')}">
+								<i class="fa fa-video-camera"></i>
+							</button>
 				`;
 			}
 
 			contentHtml += `
-						<button class="btn btn-info btn-lg" id="group-toggle-screen-share-btn" title="${__('Share your screen during this call')}">
-							<i class="fa fa-desktop"></i> ${__('Share Screen')}
-						</button>
-						<button class="btn btn-secondary btn-lg" id="group-toggle-noise-cancel-btn" title="${__('Toggle AI noise cancellation')}">
-							<i class="fa fa-assistive-listening-systems"></i> ${__('Noise Cancel')}
-						</button>
-						<button class="btn btn-primary btn-lg" id="group-add-participant-btn" title="${__('Add another person to this call')}">
-							<i class="fa fa-user-plus"></i> ${__('Add')}
-						</button>
-						<button class="btn btn-secondary btn-lg" id="group-minimize-call-btn" title="${__('Minimize call to floating widget')}">
-							<i class="fa fa-window-minimize"></i> ${__('Minimize')}
-						</button>
-						<button class="btn btn-danger btn-lg" id="group-hangup-btn">
-							<i class="fa fa-phone" style="transform: rotate(135deg);"></i> ${__('Leave Call')}
-						</button>
+							<button class="call-ctrl-btn btn-info-ctrl" id="group-toggle-screen-share-btn" data-tooltip="${__('Share Screen')}">
+								<i class="fa fa-desktop"></i>
+							</button>
+							<div class="call-more-wrapper">
+								<button class="call-ctrl-btn" id="group-more-options-btn" data-tooltip="${__('More')}">
+									<i class="fa fa-ellipsis-v"></i>
+								</button>
+								<div class="call-more-menu" id="group-more-options-menu">
+									<div class="call-more-item" id="group-toggle-noise-cancel-btn">
+										<i class="fa fa-assistive-listening-systems"></i>
+										<span>${__('Noise Cancel')}</span>
+									</div>
+									<div class="call-more-item" id="group-add-participant-btn">
+										<i class="fa fa-user-plus"></i>
+										<span>${__('Add Participant')}</span>
+									</div>
+								</div>
+							</div>
+							<button class="call-ctrl-btn btn-hangup" id="group-hangup-btn" data-tooltip="${__('Leave Call')}">
+								<i class="fa fa-phone" style="transform: rotate(135deg);"></i>
+							</button>
+						</div>
 					</div>
 				</div>
 			`;
@@ -1909,6 +1960,7 @@ class FIceCoreCallUI {
 			$content.html(contentHtml);
 
 			// Bind control events
+			// -- Primary buttons --
 			$content.find('#group-toggle-audio-btn').on('click', () => {
 				this._groupToggleAudio();
 			});
@@ -1920,20 +1972,37 @@ class FIceCoreCallUI {
 			$content.find('#group-toggle-screen-share-btn').on('click', () => {
 				this.toggleGroupScreenShare();
 			});
-			$content.find('#group-toggle-noise-cancel-btn').on('click', () => {
-				this.toggleNoiseCancellation();
-			});
 			$content.find('#group-hangup-btn').on('click', () => {
 				this.hangupGroupCall();
 			});
-			$content.find('#group-add-participant-btn').on('click', () => {
-				this.showAddParticipantDialog(null, null, callType);
-			});
+
+			// -- Minimize (top-right) --
 			$content.find('#group-minimize-call-btn').on('click', () => {
-				// Just hide the dialog — on_hide will create the floating widget
 				if (this.currentCallWindow) {
 					this.currentCallWindow.hide();
 				}
+			});
+
+			// -- More menu toggle --
+			$content.find('#group-more-options-btn').on('click', (e) => {
+				e.stopPropagation();
+				$content.find('#group-more-options-menu').toggleClass('open');
+			});
+
+			// Close group more menu on click outside
+			$(document).on('click.f-icecore-group-more-menu', (e) => {
+				if (!$(e.target).closest('.call-more-wrapper').length) {
+					$content.find('#group-more-options-menu').removeClass('open');
+				}
+			});
+
+			// -- More menu items --
+			$content.find('#group-toggle-noise-cancel-btn').on('click', () => {
+				this.toggleNoiseCancellation();
+			});
+			$content.find('#group-add-participant-btn').on('click', () => {
+				$content.find('#group-more-options-menu').removeClass('open');
+				this.showAddParticipantDialog(null, null, callType);
 			});
 
 			// Attach local stream
@@ -2136,8 +2205,10 @@ class FIceCoreCallUI {
 			const btn = document.getElementById('group-toggle-audio-btn');
 			if (btn) {
 				btn.innerHTML = muted
-					? '<i class="fa fa-microphone-slash"></i> ' + __('Unmute')
-					: '<i class="fa fa-microphone"></i> ' + __('Mute');
+					? '<i class="fa fa-microphone-slash"></i>'
+					: '<i class="fa fa-microphone"></i>';
+				btn.setAttribute('data-tooltip', muted ? __('Unmute') : __('Mute'));
+				btn.classList.toggle('active-muted', muted);
 			}
 		}
 	}
@@ -2155,9 +2226,9 @@ class FIceCoreCallUI {
 
 			const btn = document.getElementById('group-toggle-video-btn');
 			if (btn) {
-				btn.innerHTML = muted
-					? '<i class="fa fa-video-camera"></i> ' + __('Start Video')
-					: '<i class="fa fa-video-camera"></i> ' + __('Stop Video');
+				btn.innerHTML = '<i class="fa fa-video-camera"></i>';
+				btn.setAttribute('data-tooltip', muted ? __('Start Video') : __('Stop Video'));
+				btn.classList.toggle('active-off', muted);
 			}
 		}
 	}
@@ -2169,6 +2240,7 @@ class FIceCoreCallUI {
 		console.log('📞 [Group UI] Hanging up group call');
 
 		this._groupStopDurationTimer();
+		$(document).off('click.f-icecore-group-more-menu');
 		this._removeFloatingWidget();
 		this._destroyNoiseCancellation();
 
@@ -2193,6 +2265,7 @@ class FIceCoreCallUI {
 		console.log('📵 [Group UI] Group call ended');
 
 		this._groupStopDurationTimer();
+		$(document).off('click.f-icecore-group-more-menu');
 		this._removeFloatingWidget();
 		this._destroyNoiseCancellation();
 
@@ -2671,8 +2744,8 @@ class FIceCoreCallUI {
 			return;
 		}
 
-		const btn = document.getElementById('toggle-record-btn');
-		if (btn) btn.disabled = true;
+		const item = document.getElementById('toggle-record-btn');
+		if (item) item.style.pointerEvents = 'none';
 
 		try {
 			if (window.FIceCore.isRecording()) {
@@ -2700,7 +2773,7 @@ class FIceCoreCallUI {
 		} catch (error) {
 			console.error('Recording toggle failed:', error);
 		} finally {
-			if (btn) btn.disabled = false;
+			if (item) item.style.pointerEvents = '';
 		}
 	}
 
@@ -2708,17 +2781,16 @@ class FIceCoreCallUI {
 	 * Update the record button appearance.
 	 */
 	_updateRecordButton(isRecording) {
-		const btn = document.getElementById('toggle-record-btn');
-		if (!btn) return;
+		const item = document.getElementById('toggle-record-btn');
+		if (!item) return;
 
 		if (isRecording) {
-			btn.className = 'btn btn-danger btn-lg';
-			btn.innerHTML = '<i class="fa fa-stop-circle"></i> ' + __('Stop Rec');
-			btn.title = __('Stop recording');
+			item.classList.add('recording-active');
+			item.classList.remove('active');
+			item.innerHTML = '<i class="fa fa-stop-circle"></i> <span>' + __('Stop Recording') + '</span>';
 		} else {
-			btn.className = 'btn btn-secondary btn-lg';
-			btn.innerHTML = '<i class="fa fa-circle" style="color: #dc3545;"></i> ' + __('Record');
-			btn.title = __('Record this call');
+			item.classList.remove('recording-active');
+			item.innerHTML = '<i class="fa fa-circle" style="color: #dc3545;"></i> <span>' + __('Record') + '</span>';
 		}
 	}
 
@@ -3547,8 +3619,8 @@ class FIceCoreCallUI {
 			return;
 		}
 
-		const btn = document.getElementById('toggle-noise-cancel-btn') || document.getElementById('group-toggle-noise-cancel-btn');
-		if (btn) btn.disabled = true;
+		const item = document.getElementById('toggle-noise-cancel-btn') || document.getElementById('group-toggle-noise-cancel-btn');
+		if (item) item.style.pointerEvents = 'none';
 
 		try {
 			if (this._noiseCancelEnabled) {
@@ -3578,7 +3650,7 @@ class FIceCoreCallUI {
 		} catch (error) {
 			console.error('🔇 Noise cancellation toggle error:', error);
 		} finally {
-			if (btn) btn.disabled = false;
+			if (item) item.style.pointerEvents = '';
 		}
 	}
 
@@ -3686,23 +3758,21 @@ class FIceCoreCallUI {
 	 * Update the noise cancellation button appearance.
 	 */
 	_updateNoiseCancelButton(isEnabled) {
-		// Update both 1:1 and group buttons
-		const btns = [
+		// Update both 1:1 and group menu items
+		const items = [
 			document.getElementById('toggle-noise-cancel-btn'),
 			document.getElementById('group-toggle-noise-cancel-btn')
 		];
 
-		for (const btn of btns) {
-			if (!btn) continue;
+		for (const item of items) {
+			if (!item) continue;
 
 			if (isEnabled) {
-				btn.className = 'btn btn-success btn-lg';
-				btn.innerHTML = '<i class="fa fa-assistive-listening-systems"></i> ' + __('NC On');
-				btn.title = __('Noise cancellation is active — click to disable');
+				item.classList.add('active');
+				item.innerHTML = '<i class="fa fa-assistive-listening-systems"></i> <span>' + __('NC On') + '</span>';
 			} else {
-				btn.className = 'btn btn-secondary btn-lg';
-				btn.innerHTML = '<i class="fa fa-assistive-listening-systems"></i> ' + __('Noise Cancel');
-				btn.title = __('Toggle AI noise cancellation');
+				item.classList.remove('active');
+				item.innerHTML = '<i class="fa fa-assistive-listening-systems"></i> <span>' + __('Noise Cancel') + '</span>';
 			}
 		}
 	}
