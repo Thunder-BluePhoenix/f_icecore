@@ -34,8 +34,268 @@
 	display: block;
 }
 
-/* Call Controls */
-.call-controls button {
+/* ===== Redesigned Call Controls ===== */
+.call-controls {
+	text-align: center;
+	margin-top: 20px;
+	padding: 0 10px;
+}
+
+.call-controls-primary {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+/* Icon-only circular button */
+.call-ctrl-btn {
+	position: relative;
+	border-radius: 50%;
+	width: 48px;
+	height: 48px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	background: #4a4a5a;
+	color: #fff;
+	cursor: pointer;
+	transition: all 0.25s ease;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+	outline: none;
+	padding: 0;
+}
+
+.call-ctrl-btn:hover {
+	transform: scale(1.12);
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.call-ctrl-btn:active {
+	transform: scale(0.95);
+}
+
+.call-ctrl-btn i {
+	font-size: 18px;
+	line-height: 1;
+}
+
+/* Custom CSS Tooltip */
+.call-ctrl-btn[data-tooltip]::after {
+	content: attr(data-tooltip);
+	position: absolute;
+	bottom: calc(100% + 8px);
+	left: 50%;
+	transform: translateX(-50%) scale(0.8);
+	background: #1a1a2e;
+	color: #fff;
+	font-size: 11px;
+	font-weight: 500;
+	padding: 4px 10px;
+	border-radius: 4px;
+	white-space: nowrap;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.2s ease, transform 0.2s ease;
+	z-index: 100;
+}
+
+.call-ctrl-btn[data-tooltip]::before {
+	content: '';
+	position: absolute;
+	bottom: calc(100% + 3px);
+	left: 50%;
+	transform: translateX(-50%) scale(0.8);
+	border: 5px solid transparent;
+	border-top-color: #1a1a2e;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.2s ease, transform 0.2s ease;
+	z-index: 100;
+}
+
+.call-ctrl-btn[data-tooltip]:hover::after,
+.call-ctrl-btn[data-tooltip]:hover::before {
+	opacity: 1;
+	transform: translateX(-50%) scale(1);
+}
+
+/* Button color variants */
+.call-ctrl-btn.btn-info-ctrl {
+	background: #17a2b8;
+}
+
+.call-ctrl-btn.btn-info-ctrl:hover {
+	background: #138496;
+}
+
+/* Hangup button — red, slightly bigger */
+.call-ctrl-btn.btn-hangup {
+	background: #dc3545;
+	width: 54px;
+	height: 54px;
+}
+
+.call-ctrl-btn.btn-hangup:hover {
+	background: #c82333;
+}
+
+.call-ctrl-btn.btn-hangup i {
+	font-size: 20px;
+}
+
+/* Active/toggle states */
+.call-ctrl-btn.active-muted {
+	background: #dc3545;
+}
+
+.call-ctrl-btn.active-muted:hover {
+	background: #c82333;
+}
+
+.call-ctrl-btn.active-off {
+	background: #dc3545;
+}
+
+.call-ctrl-btn.active-off:hover {
+	background: #c82333;
+}
+
+.call-ctrl-btn.active-sharing {
+	background: #ffc107;
+	color: #212529;
+}
+
+.call-ctrl-btn.active-sharing:hover {
+	background: #e0a800;
+}
+
+/* ===== More Menu ===== */
+.call-more-wrapper {
+	position: relative;
+	display: inline-flex;
+}
+
+.call-more-menu {
+	position: absolute;
+	bottom: calc(100% + 10px);
+	left: 50%;
+	transform: translateX(-50%) scale(0.9);
+	background: #fff;
+	border-radius: 10px;
+	box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+	min-width: 200px;
+	padding: 6px 0;
+	opacity: 0;
+	visibility: hidden;
+	transition: all 0.2s ease;
+	z-index: 200;
+}
+
+.call-more-menu.open {
+	opacity: 1;
+	visibility: visible;
+	transform: translateX(-50%) scale(1);
+}
+
+.call-more-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 16px;
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 500;
+	color: #333;
+	transition: background 0.15s ease;
+	user-select: none;
+}
+
+.call-more-item:hover {
+	background: #f0f2f5;
+}
+
+.call-more-item i {
+	font-size: 16px;
+	width: 20px;
+	text-align: center;
+	flex-shrink: 0;
+}
+
+.call-more-item span {
+	flex: 1;
+}
+
+/* Active state for menu items (noise cancel on, recording) */
+.call-more-item.active {
+	background: #e8f5e9;
+	color: #2e7d32;
+}
+
+.call-more-item.active:hover {
+	background: #c8e6c9;
+}
+
+.call-more-item.recording-active {
+	background: #ffebee;
+	color: #c62828;
+}
+
+.call-more-item.recording-active:hover {
+	background: #ffcdd2;
+}
+
+/* ===== Minimize Button — Top Right of Call Popup ===== */
+.call-minimize-top-right {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	border: none;
+	background: rgba(0, 0, 0, 0.4);
+	color: #fff;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	z-index: 50;
+	transition: all 0.2s ease;
+}
+
+.call-minimize-top-right:hover {
+	background: rgba(0, 0, 0, 0.7);
+	transform: scale(1.1);
+}
+
+.call-minimize-top-right[data-tooltip]::after {
+	content: attr(data-tooltip);
+	position: absolute;
+	bottom: calc(100% + 6px);
+	left: 50%;
+	transform: translateX(-50%);
+	background: #1a1a2e;
+	color: #fff;
+	font-size: 11px;
+	font-weight: 500;
+	padding: 3px 8px;
+	border-radius: 4px;
+	white-space: nowrap;
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	z-index: 100;
+}
+
+.call-minimize-top-right[data-tooltip]:hover::after {
+	opacity: 1;
+}
+
+/* Legacy override — remove old button styles for .call-controls */
+.call-controls button.btn {
 	border-radius: 50%;
 	width: 60px;
 	height: 60px;
@@ -46,12 +306,12 @@
 	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
-.call-controls button:hover {
+.call-controls button.btn:hover {
 	transform: scale(1.1);
 	box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
-.call-controls button i {
+.call-controls button.btn i {
 	font-size: 20px;
 }
 
@@ -362,12 +622,30 @@
 		right: 10px !important;
 	}
 
-	.call-controls button {
+	.call-ctrl-btn {
+		width: 42px;
+		height: 42px;
+	}
+
+	.call-ctrl-btn i {
+		font-size: 16px;
+	}
+
+	.call-ctrl-btn.btn-hangup {
+		width: 48px;
+		height: 48px;
+	}
+
+	.call-more-menu {
+		min-width: 180px;
+	}
+
+	.call-controls button.btn {
 		width: 50px;
 		height: 50px;
 	}
 
-	.call-controls button i {
+	.call-controls button.btn i {
 		font-size: 16px;
 	}
 }

@@ -32,9 +32,13 @@ def start_recording(call_id=None, group_call_id=None, call_type="audio"):
 	user = frappe.session.user
 
 	# Check if recording is enabled in settings
-	enabled = frappe.db.get_single_value("F IceCore Settings", "enable_call_recording")
-	if not enabled:
-		return {"success": False, "message": _("Call recording is disabled by administrator")}
+	try:
+		enabled = frappe.db.get_single_value("F IceCore Settings", "enable_call_recording")
+		# enabled=0 means explicitly disabled; enabled=1 or None means allow
+		if enabled == 0:
+			return {"success": False, "message": _("Call recording is disabled by administrator")}
+	except Exception:
+		pass  # Settings doc may not exist yet, allow recording
 
 	# Validate that at least one call reference is provided
 	if not call_id and not group_call_id:
