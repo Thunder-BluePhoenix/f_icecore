@@ -7,10 +7,16 @@ def get_turn_credentials(ttl=86400):
 	turn_config = get_turn_config()
 	if not turn_config.get("secret"):
 		frappe.throw("TURN server not configured")
+
+	server = turn_config['server']
+	# Remove port from server string if it's already there (e.g. "1.2.3.4:3478")
+	if ":" in server:
+		server = server.split(":")[0]
+
 	username, credential = generate_turn_credentials(turn_config["secret"], ttl)
 	ice_servers = [
-		{"urls": f"stun:{turn_config['server']}:{turn_config.get('stun_port', 3478)}"},
-		{"urls": [f"turn:{turn_config['server']}:{turn_config.get('turn_port', 3478)}?transport=udp"],
+		{"urls": f"stun:{server}:{turn_config.get('stun_port', 3478)}"},
+		{"urls": [f"turn:{server}:{turn_config.get('turn_port', 3478)}?transport=udp"],
 		 "username": username, "credential": credential, "credentialType": "password"}
 	]
 	return {"ice_servers": ice_servers, "ttl": ttl, "expires_at": int(time.time()) + ttl}

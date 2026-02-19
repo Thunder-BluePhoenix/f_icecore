@@ -26,8 +26,8 @@ const net = require('net');
 // --- Configuration ---
 const WEB_HTTPS_PORT = 8443;      // HTTPS port for web
 const SOCKETIO_HTTPS_PORT = 9443;  // WSS port for SocketIO
-const WEB_HTTP_PORT = 8002;        // Frappe web server
-const SOCKETIO_HTTP_PORT = 9002;   // Frappe SocketIO server
+const WEB_HTTP_PORT = 8005;        // Frappe web server
+const SOCKETIO_HTTP_PORT = 9005;   // Frappe SocketIO server
 const BIND_HOST = '0.0.0.0';
 
 // Certificate paths

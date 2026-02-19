@@ -33,7 +33,7 @@ app_include_js = [
 	"/assets/f_icecore/js/noise_cancellation.js",   # Noise cancellation engine (Web Audio API)
 	"/assets/f_icecore/js/call_ui.js",              # Call UI - With minimize, noise cancel, HTTP polling!
 	"/assets/f_icecore/js/f_icecore.bundle.js",     # Additional features
-	"/assets/f_icecore/js/f_icecore_boot.js"        # Navbar with pending calls + search/multi-select
+	"/assets/f_icecore/js/f_icecore_boot2.js"        # Navbar with pending calls + search/multi-select
 ]
 
 # include js, css files in header of web template
