@@ -215,19 +215,21 @@ mkdir -p "$CREDS_DIR"
 CREDS_FILE="$CREDS_DIR/f_icecore_credentials.txt"
 
 cat > "$CREDS_FILE" <<EOF
-F-IceCore TURN Server Credentials
-==================================
-Generated: $(date)
+# F-IceCore TURN Server Credentials
+# Generated: $(date)
+# Format: KEY=VALUE (machine-readable)
 
-TURN Secret: $TURN_SECRET
-Realm: $REALM
-Server IP: $SERVER_IP
+TURN_SERVER=$SERVER_IP
+TURN_SECRET=$TURN_SECRET
+STUN_PORT=3478
+TURN_PORT=3478
+TURNS_PORT=5349
+REALM=$REALM
 
-STUN URL: stun:$SERVER_IP:3478
-TURN URL: turn:$SERVER_IP:3478
-TURNS URL: turns:$SERVER_IP:5349
-
-Note: Use REST API to generate time-limited credentials
+# URLs for reference:
+# STUN URL: stun:$SERVER_IP:3478
+# TURN URL: turn:$SERVER_IP:3478
+# TURNS URL: turns:$SERVER_IP:5349
 EOF
 
 chmod 600 "$CREDS_FILE"
@@ -272,6 +274,66 @@ elif [ "$OS_TYPE" = "macOS" ]; then
     echo ""
     echo "⚠️  Note: For production use on macOS, you may want to run Coturn on a Linux server"
     echo "   macOS is suitable for development/testing only"
+fi
+
+# ============================================================
+# Auto-save credentials to Frappe F IceCore Settings
+# ============================================================
+echo ""
+echo "💾 Auto-saving credentials to Frappe..."
+
+# Detect bench path from script location
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Script is at: <bench>/apps/f_icecore/install_scripts/install_coturn.sh
+# Bench is 3 levels up from the app root
+BENCH_PATH="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+
+if [ -d "$BENCH_PATH/sites" ] && [ -f "$BENCH_PATH/Procfile" ]; then
+    echo "📍 Detected bench path: $BENCH_PATH"
+
+    # Detect site name
+    SITE_NAME=$(ls -1 "$BENCH_PATH/sites" 2>/dev/null | grep -v "assets" | grep -v "common_site_config.json" | grep -v "apps.txt" | head -1)
+
+    if [ -n "$SITE_NAME" ]; then
+        echo "📍 Detected site: $SITE_NAME"
+
+        # Determine the user who should run bench commands
+        if [ "$OS_TYPE" = "Linux" ] && [ "$EUID" -eq 0 ]; then
+            # Running as root on Linux — find the actual bench owner
+            BENCH_OWNER=$(stat -c '%U' "$BENCH_PATH" 2>/dev/null || ls -ld "$BENCH_PATH" | awk '{print $3}')
+            echo "📍 Bench owner: $BENCH_OWNER"
+
+            su - "$BENCH_OWNER" -c "cd '$BENCH_PATH' && bench --site '$SITE_NAME' execute 'f_icecore.patches.v1.check_coturn_configuration._check_and_populate_turn_config'" 2>/dev/null && {
+                echo "✅ Credentials auto-saved to F IceCore Settings!"
+            } || {
+                echo "⚠️  Auto-save failed. Trying save_credentials.sh..."
+                bash "$SCRIPT_DIR/save_credentials.sh" "$SERVER_IP" "$TURN_SECRET" "$BENCH_PATH" "$SITE_NAME" 2>/dev/null || {
+                    echo "⚠️  Could not auto-save. Please save manually:"
+                    echo "   Go to F IceCore Settings and click 'Save Credentials'"
+                    echo "   Or run: bash install_scripts/save_credentials.sh $SERVER_IP <secret> $BENCH_PATH $SITE_NAME"
+                }
+            }
+        else
+            # Running as normal user (macOS or non-root)
+            cd "$BENCH_PATH" && bench --site "$SITE_NAME" execute "f_icecore.patches.v1.check_coturn_configuration._check_and_populate_turn_config" 2>/dev/null && {
+                echo "✅ Credentials auto-saved to F IceCore Settings!"
+            } || {
+                echo "⚠️  Auto-save failed. Trying save_credentials.sh..."
+                bash "$SCRIPT_DIR/save_credentials.sh" "$SERVER_IP" "$TURN_SECRET" "$BENCH_PATH" "$SITE_NAME" 2>/dev/null || {
+                    echo "⚠️  Could not auto-save. Please save manually:"
+                    echo "   Go to F IceCore Settings and click 'Save Credentials'"
+                    echo "   Or run: bash install_scripts/save_credentials.sh $SERVER_IP <secret> $BENCH_PATH $SITE_NAME"
+                }
+            }
+        fi
+    else
+        echo "⚠️  No site found. Please save credentials manually:"
+        echo "   Go to F IceCore Settings and click 'Save Credentials'"
+    fi
+else
+    echo "⚠️  Could not detect bench path. Please save credentials manually:"
+    echo "   Go to F IceCore Settings and click 'Save Credentials'"
+    echo "   Or run: bash install_scripts/save_credentials.sh $SERVER_IP <secret> <bench_path> <site>"
 fi
 
 echo ""

@@ -87,6 +87,26 @@ function setup_button_handlers(frm) {
 		}
 	}, 100);
 
+	// Generate & Populate Credentials Button
+	setTimeout(() => {
+		const gen_btn = frm.fields_dict.generate_populate_credentials_button;
+		if (gen_btn && gen_btn.$input) {
+			console.log('🔵 F-IceCore Settings: Found generate_populate_credentials_button field');
+
+			gen_btn.$input.off('click');
+
+			gen_btn.$input.on('click', function(e) {
+				e.preventDefault();
+				console.log('🔵 F-IceCore Settings: Generate credentials button clicked!');
+				generate_and_populate_credentials(frm);
+			});
+
+			console.log('✅ F-IceCore Settings: Generate credentials button handler attached');
+		} else {
+			console.warn('⚠️ F-IceCore Settings: generate_populate_credentials_button field not found');
+		}
+	}, 100);
+
 	// Save Credentials Button
 	setTimeout(() => {
 		const save_btn = frm.fields_dict.save_credentials_button;
@@ -326,6 +346,147 @@ function save_turn_credentials(frm) {
 			indicator: 'red'
 		}, 5);
 	});
+}
+
+function generate_and_populate_credentials(frm) {
+	console.log('🔵 F-IceCore Settings: Generating new TURN credentials...');
+
+	const status_el = $('#generate-credentials-status');
+
+	// Confirm with user
+	frappe.confirm(
+		__('<strong>Are you sure?</strong><br><br>' +
+			'This will generate a <strong>new TURN secret</strong> and populate all server fields.<br><br>' +
+			'<strong>Important:</strong><br>' +
+			'• The secret will be shown <strong>only once</strong> — save it securely.<br>' +
+			'• If you have a running Coturn server, you must update <code>/etc/turnserver.conf</code> with the new secret and restart Coturn.<br>' +
+			'• Any existing TURN configuration will be overwritten.'),
+		() => {
+			// User confirmed — proceed
+			status_el.html(`
+				<div class="alert alert-info">
+					<i class="fa fa-spinner fa-spin"></i> Generating new credentials...
+				</div>
+			`);
+
+			frappe.call({
+				method: 'f_icecore.f_icecore.api.turn_credentials.generate_and_populate_credentials',
+				callback: (r) => {
+					console.log('🔵 F-IceCore Settings: Generate response:', r);
+
+					if (r.message && r.message.success) {
+						const data = r.message;
+
+						status_el.html(`
+							<div class="alert alert-success">
+								<i class="fa fa-check-circle"></i> <strong>Credentials Generated Successfully!</strong>
+							</div>
+						`);
+
+						// Show the secret in a prominent dialog — one-time only
+						const secret_dialog = new frappe.ui.Dialog({
+							title: __('TURN Secret Generated — Save Now!'),
+							size: 'large',
+							fields: [
+								{
+									fieldtype: 'HTML',
+									fieldname: 'secret_html',
+									options: `
+										<div style="padding: 15px;">
+											<div class="alert alert-danger" style="margin-bottom: 15px;">
+												<i class="fa fa-exclamation-triangle"></i>
+												<strong> WARNING: This secret will NOT be shown again!</strong><br>
+												Copy and save it securely. Do not share it with others.
+											</div>
+
+											<div style="background: #1a1a2e; color: #0f0; padding: 20px; border-radius: 8px; font-family: monospace; font-size: 14px; margin-bottom: 15px; word-break: break-all; user-select: all;">
+												${data.secret}
+											</div>
+
+											<div style="margin-bottom: 15px;">
+												<button class="btn btn-sm btn-primary" onclick="navigator.clipboard.writeText('${data.secret}').then(() => frappe.show_alert({message: 'Secret copied to clipboard!', indicator: 'green'}, 3))">
+													<i class="fa fa-clipboard"></i> Copy Secret
+												</button>
+											</div>
+
+											<table class="table table-bordered" style="margin-bottom: 15px;">
+												<tbody>
+													<tr><td><strong>TURN Server</strong></td><td>${data.server}</td></tr>
+													<tr><td><strong>STUN Port</strong></td><td>${data.stun_port}</td></tr>
+													<tr><td><strong>TURN Port</strong></td><td>${data.turn_port}</td></tr>
+													<tr><td><strong>TURNS Port (TLS)</strong></td><td>${data.turns_port}</td></tr>
+												</tbody>
+											</table>
+
+											<div class="alert alert-warning" style="margin-bottom: 0;">
+												<strong>Next Steps:</strong><br>
+												1. Copy the secret above and save it somewhere secure.<br>
+												2. If Coturn is running, update <code>/etc/turnserver.conf</code>:<br>
+												<code style="display:block; margin: 5px 0 5px 15px;">static-auth-secret=${data.secret}</code>
+												3. Restart Coturn: <code>sudo systemctl restart coturn</code><br>
+												4. Click "Test TURN Connection" below to verify.
+											</div>
+										</div>
+									`
+								}
+							],
+							primary_action_label: __('I Have Saved the Secret'),
+							primary_action: () => {
+								secret_dialog.hide();
+								// Reload the form to show updated values
+								frm.reload_doc();
+							}
+						});
+
+						secret_dialog.show();
+						// Prevent closing without confirmation
+						secret_dialog.$wrapper.find('.btn-close, .modal-header .close').on('click', function(e) {
+							e.preventDefault();
+							frappe.confirm(
+								__('Are you sure you have saved the secret? It will not be shown again.'),
+								() => { secret_dialog.hide(); frm.reload_doc(); }
+							);
+							return false;
+						});
+
+						console.log('✅ F-IceCore Settings: Credentials generated and populated');
+					} else {
+						const error_msg = r.message ? r.message.message : 'Failed to generate credentials';
+						status_el.html(`
+							<div class="alert alert-danger">
+								<i class="fa fa-times-circle"></i> <strong>Generation Failed</strong><br>
+								${error_msg}
+							</div>
+						`);
+
+						frappe.show_alert({
+							message: error_msg,
+							indicator: 'red'
+						}, 5);
+					}
+				},
+				error: (err) => {
+					console.error('❌ F-IceCore Settings: Error generating credentials:', err);
+
+					status_el.html(`
+						<div class="alert alert-danger">
+							<i class="fa fa-exclamation-triangle"></i> <strong>Error</strong><br>
+							${err.message || 'Unknown error occurred'}
+						</div>
+					`);
+
+					frappe.show_alert({
+						message: __('Error generating TURN credentials'),
+						indicator: 'red'
+					}, 5);
+				}
+			});
+		},
+		() => {
+			// User cancelled
+			console.log('🔵 F-IceCore Settings: Generate credentials cancelled by user');
+		}
+	);
 }
 
 console.log('✅ F-IceCore: Settings form script loaded');

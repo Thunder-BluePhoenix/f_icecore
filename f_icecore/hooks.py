@@ -92,6 +92,7 @@ app_include_js = [
 
 # before_install = "f_icecore.f_icecore.install.before_install"
 after_install = "f_icecore.f_icecore.install.setup.post_install"
+after_migrate = ["f_icecore.f_icecore.install.setup.after_migrate"]
 
 # Uninstallation
 # ------------
