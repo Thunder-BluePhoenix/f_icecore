@@ -5,3 +5,4 @@
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
 f_icecore.patches.v1.enable_call_recording_default
+f_icecore.patches.v1.check_coturn_configuration

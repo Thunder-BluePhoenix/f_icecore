@@ -11,6 +11,10 @@
   "stun_port",
   "turn_port",
   "turns_port",
+  "generate_credentials_section",
+  "generate_credentials_info",
+  "generate_populate_credentials_button",
+  "generate_credentials_status",
   "section_break_8",
   "test_connection_button",
   "connection_status",
@@ -82,6 +86,30 @@
    "fieldtype": "Int",
    "label": "TURNS Port (TLS)",
    "description": "Port for TURN over TLS (default: 5349)"
+  },
+  {
+   "fieldname": "generate_credentials_section",
+   "fieldtype": "Section Break",
+   "label": "Generate TURN Credentials",
+   "description": "Auto-generate a new TURN secret and populate all server fields. Use this if Coturn is already installed."
+  },
+  {
+   "fieldname": "generate_credentials_info",
+   "fieldtype": "HTML",
+   "label": "Generate Info",
+   "options": "<div class=\"alert alert-warning\" style=\"margin-bottom: 10px;\"><strong>⚠️ Important:</strong> Clicking <strong>Generate & Populate Credentials</strong> will create a new TURN secret. The secret will be shown <strong>only once</strong> — save it securely. If you have a running Coturn server, you must also update <code>/etc/turnserver.conf</code> with the new secret and restart Coturn.</div>"
+  },
+  {
+   "fieldname": "generate_populate_credentials_button",
+   "fieldtype": "Button",
+   "label": "Generate & Populate Credentials",
+   "description": "Generate a new TURN secret and populate all fields automatically"
+  },
+  {
+   "fieldname": "generate_credentials_status",
+   "fieldtype": "HTML",
+   "label": "Generate Status",
+   "options": "<div id=\"generate-credentials-status\"></div>"
   },
   {
    "fieldname": "section_break_8",

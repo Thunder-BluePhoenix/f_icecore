@@ -1,6 +1,6 @@
 import frappe
 from frappe.utils.password import get_decrypted_password
-import hmac, hashlib, base64, time
+import hmac, hashlib, base64, time, os, subprocess, socket, secrets
 
 @frappe.whitelist()
 def get_turn_credentials(ttl=86400):
@@ -68,6 +68,105 @@ def get_turn_config():
 def get_ice_servers():
 	creds = get_turn_credentials()
 	return creds["ice_servers"]
+
+@frappe.whitelist()
+def generate_and_populate_credentials():
+	"""
+	Generate a new TURN secret and populate all TURN/STUN fields.
+	The secret is returned in cleartext ONCE for the user to save.
+	It will not be shown again (stored as Password field).
+	"""
+	frappe.only_for("System Manager")
+
+	# Generate a strong 64-character hex secret
+	new_secret = secrets.token_hex(32)
+
+	# Detect server IP/hostname
+	server_address = _detect_server_address()
+
+	# Default ports
+	stun_port = 3478
+	turn_port = 3478
+	turns_port = 5349
+
+	# Try to read ports from existing turnserver.conf if available
+	conf_paths = ["/etc/turnserver.conf", "/etc/coturn/turnserver.conf", "/usr/local/etc/turnserver.conf"]
+	for conf_path in conf_paths:
+		if os.path.exists(conf_path):
+			try:
+				with open(conf_path, "r") as f:
+					for line in f:
+						line = line.strip()
+						if line.startswith("listening-port="):
+							stun_port = int(line.split("=", 1)[1].strip())
+							turn_port = stun_port
+						elif line.startswith("tls-listening-port="):
+							turns_port = int(line.split("=", 1)[1].strip())
+				break
+			except Exception:
+				pass
+
+	# Get or create the settings doc
+	if not frappe.db.exists("F IceCore Settings", "F IceCore Settings"):
+		settings = frappe.new_doc("F IceCore Settings")
+		settings.name = "F IceCore Settings"
+	else:
+		settings = frappe.get_doc("F IceCore Settings", "F IceCore Settings")
+
+	# Populate all fields
+	settings.turn_server = server_address
+	settings.turn_secret = new_secret
+	settings.stun_port = stun_port
+	settings.turn_port = turn_port
+	settings.turns_port = turns_port
+	settings.save(ignore_permissions=True)
+	frappe.db.commit()
+
+	return {
+		"success": True,
+		"secret": new_secret,
+		"server": server_address,
+		"stun_port": stun_port,
+		"turn_port": turn_port,
+		"turns_port": turns_port
+	}
+
+
+def _detect_server_address():
+	"""Detect the server IP address or hostname for TURN configuration."""
+	# Try to get from site config
+	host_name = frappe.conf.get("host_name", "")
+	if host_name:
+		# Strip protocol
+		host_name = host_name.replace("https://", "").replace("http://", "")
+		# Strip port
+		if ":" in host_name:
+			host_name = host_name.split(":")[0]
+		if host_name and host_name != "localhost":
+			return host_name
+
+	# Try to get the machine's IP
+	try:
+		s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+		s.connect(("8.8.8.8", 80))
+		ip = s.getsockname()[0]
+		s.close()
+		if ip and ip != "127.0.0.1":
+			return ip
+	except Exception:
+		pass
+
+	# Try hostname
+	try:
+		hostname = socket.gethostname()
+		ip = socket.gethostbyname(hostname)
+		if ip and ip != "127.0.0.1":
+			return ip
+	except Exception:
+		pass
+
+	return "localhost"
+
 
 @frappe.whitelist()
 def test_turn_connection():
